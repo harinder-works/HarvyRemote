@@ -276,15 +276,13 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative ${
-        remoteMode === 'mini' ? 'pointer-events-none bg-transparent' : 'bg-black/35 backdrop-blur-[2px]'
-      }`}
+      className="min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative bg-transparent pointer-events-none"
     >
       {/* 
         NO WEBSITE HEADER.
         NO OUTSIDE BUTTONS.
-        NO FULLSCREEN COVERAGE IN FLOATING MINI MODE.
-        Only the remote takes up space, rest of screen remains clear.
+        NO DARK FULLSCREEN OVERLAY OR BACKGROUND.
+        Only the remote itself captures touches and takes up physical space.
       */}
 
       {/* Voice Search Floating Toast (Appears over the remote when voice search is active) */}
