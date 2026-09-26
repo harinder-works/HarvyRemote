@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowLeft,
   Home,
@@ -16,6 +16,7 @@ import {
   Search,
   Check,
   RotateCcw,
+  GripHorizontal,
 } from 'lucide-react';
 import { AppShortcut, PRESET_APPS, RemoteTheme } from '../types/remote';
 import { AppIconRenderer, GoogleDots, WebsiteEmblem } from './BrandIcons';
@@ -175,11 +176,11 @@ export function GoogleTVRemote({
   };
 
   // Trackpad swipe handlers
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handleTrackpadPointerDown = (e: React.PointerEvent) => {
     setTouchStartPos({ x: e.clientX, y: e.clientY });
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
+  const handleTrackpadPointerUp = (e: React.PointerEvent) => {
     if (!touchStartPos) return;
     const dx = e.clientX - touchStartPos.x;
     const dy = e.clientY - touchStartPos.y;
@@ -280,13 +281,163 @@ export function GoogleTVRemote({
       app.shortLabel.toLowerCase().includes(channelSearchQuery.toLowerCase())
   );
 
+  // Position and mobile touch-dragging state for Full Remote mode
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const fullRemoteRef = useRef<HTMLDivElement>(null);
+
+  // Initialize position centered horizontally or nicely placed
+  useEffect(() => {
+    if (typeof window !== 'undefined' && position === null) {
+      const defaultX = Math.max(16, (window.innerWidth - 220) / 2);
+      const defaultY = Math.max(16, (window.innerHeight - 510) / 2);
+      setPosition({ x: defaultX, y: defaultY });
+    }
+  }, [position]);
+
+  // Sync bounding box with native Android overlay bridge so touches outside remote pass through
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).AndroidOverlayBridge) {
+      if (fullRemoteRef.current) {
+        const rect = fullRemoteRef.current.getBoundingClientRect();
+        const density = window.devicePixelRatio || 1;
+        try {
+          (window as any).AndroidOverlayBridge.updateRemoteBounds(
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.bottom,
+            density
+          );
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [position]);
+
+  // Touch-based dragging for full remote
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input')) return;
+
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      const touch = e.touches[0];
+      const currentX = position?.x ?? Math.max(16, (window.innerWidth - 220) / 2);
+      const currentY = position?.y ?? Math.max(16, (window.innerHeight - 510) / 2);
+
+      dragStartRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        initialX: currentX,
+        initialY: currentY,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !dragStartRef.current || e.touches.length === 0) return;
+    const touch = e.touches[0];
+
+    const deltaX = touch.clientX - dragStartRef.current.startX;
+    const deltaY = touch.clientY - dragStartRef.current.startY;
+
+    const newX = dragStartRef.current.initialX + deltaX;
+    const newY = dragStartRef.current.initialY + deltaY;
+
+    const width = 220;
+    const height = 510;
+    const clampedX = Math.min(Math.max(4, newX), window.innerWidth - width - 4);
+    const clampedY = Math.min(Math.max(4, newY), window.innerHeight - height - 4);
+
+    setPosition({ x: clampedX, y: clampedY });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input')) return;
+
+    if (!fullRemoteRef.current) return;
+    setIsDragging(true);
+    fullRemoteRef.current.setPointerCapture(e.pointerId);
+
+    const currentX = position?.x ?? Math.max(16, (window.innerWidth - 220) / 2);
+    const currentY = position?.y ?? Math.max(16, (window.innerHeight - 510) / 2);
+
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: currentX,
+      initialY: currentY,
+    };
+  };
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      if (!isDragging || !dragStartRef.current) return;
+
+      const deltaX = e.clientX - dragStartRef.current.startX;
+      const deltaY = e.clientY - dragStartRef.current.startY;
+
+      const newX = dragStartRef.current.initialX + deltaX;
+      const newY = dragStartRef.current.initialY + deltaY;
+
+      const width = 220;
+      const height = 510;
+      const clampedX = Math.min(Math.max(4, newX), window.innerWidth - width - 4);
+      const clampedY = Math.min(Math.max(4, newY), window.innerHeight - height - 4);
+
+      setPosition({ x: clampedX, y: clampedY });
+    },
+    [isDragging]
+  );
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    if (isDragging && fullRemoteRef.current) {
+      try {
+        fullRemoteRef.current.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      setIsDragging(false);
+      dragStartRef.current = null;
+    }
+  };
+
   return (
-    <div className="relative select-none flex items-center justify-center">
+    <div
+      ref={fullRemoteRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{
+        transform: position ? `translate3d(${position.x}px, ${position.y}px, 0)` : undefined,
+        touchAction: 'none',
+      }}
+      className={`fixed top-0 left-0 z-50 select-none flex items-center justify-center ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      }`}
+    >
       {/* Remote Outer Casing Container with Side Volume Rocker */}
-      <div className="relative flex items-center justify-center py-2 px-6">
+      <div className="relative flex items-center justify-center py-1 px-5">
         
         {/* PHYSICAL HARDWARE: Right Edge Volume Rocker */}
-        <div className="absolute right-2 top-48 z-20 flex flex-col items-center">
+        <div className="absolute right-1 top-48 z-20 flex flex-col items-center">
           <div className="w-4 h-32 rounded-r-xl bg-gradient-to-r from-black/20 via-black/10 to-transparent flex flex-col justify-between py-1 shadow-md">
             {/* Volume Up */}
             <button
@@ -317,11 +468,28 @@ export function GoogleTVRemote({
           </div>
         </div>
 
-        {/* Remote Pebble Body (ALL CONTROLS FULLY EMBEDDED INSIDE) */}
+        {/* Remote Pebble Body (ALL CONTROLS FULLY EMBEDDED INSIDE - Roundness matching MiniRemote rounded-[44px]) */}
         <div
-          className={`w-[196px] rounded-[60px] ${styles.body} border-2 remote-shadow transition-colors duration-300 relative flex flex-col items-center pt-3 pb-6 px-4`}
+          className={`w-[196px] rounded-[44px] ${styles.body} border-2 remote-shadow transition-colors duration-300 relative flex flex-col items-center pt-2.5 pb-6 px-4`}
           style={{ minHeight: '488px' }}
         >
+          {/* Top Drag Grip Bar */}
+          <div className="w-full flex items-center justify-between pb-1 mb-1.5 border-b border-black/10 cursor-grab active:cursor-grabbing">
+            <div className="flex items-center gap-1.5 pl-1 py-0.5">
+              <GripHorizontal className="w-4 h-4 text-slate-400" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Google TV</span>
+            </div>
+            <button
+              onClick={() => {
+                sound.playClick('action');
+                onSwitchToMini();
+              }}
+              title="Minimize to Floating Mini Remote"
+              className="p-1 rounded-full text-slate-500 hover:text-slate-900 hover:bg-black/10 transition-colors"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
           {/* TOP BEZEL INSIDE REMOTE: TV Status, IR LED, and Mode/Mini Switch */}
           <div className="w-full flex items-center justify-between px-1 mb-2.5">
             {/* TV Device Connection Pill (Inside remote) */}
@@ -354,7 +522,7 @@ export function GoogleTVRemote({
               />
             </div>
 
-            {/* Face Switch or Mini Remote Button */}
+            {/* Face Switch (Grid Channels / D-Pad) */}
             {remoteFace === 'channels' ? (
               <button
                 onClick={() => {
@@ -370,12 +538,12 @@ export function GoogleTVRemote({
               <button
                 onClick={() => {
                   sound.playClick('action');
-                  onSwitchToMini();
+                  setRemoteFace('channels');
                 }}
-                title="Switch to Draggable Mini Remote"
+                title="Browse Channels / Apps"
                 className="p-1 rounded-full text-slate-500 hover:text-slate-900 hover:bg-black/10 transition-colors"
               >
-                <Minimize2 className="w-3.5 h-3.5" />
+                <Grid className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -461,8 +629,8 @@ export function GoogleTVRemote({
               ) : (
                 /* Swipe Trackpad Area */
                 <div
-                  onPointerDown={handlePointerDown}
-                  onPointerUp={handlePointerUp}
+                  onPointerDown={handleTrackpadPointerDown}
+                  onPointerUp={handleTrackpadPointerUp}
                   className={`w-[138px] h-[138px] rounded-3xl ${styles.dpadRing} border-2 dpad-groove mb-3 flex flex-col items-center justify-center text-center p-3 cursor-pointer touch-none active:brightness-95 transition-all`}
                 >
                   <MousePointer className="w-5 h-5 text-sky-500 mb-1 opacity-80" />
