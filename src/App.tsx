@@ -23,9 +23,9 @@ export default function App() {
   // Always the classic white (Snow) Google TV remote
   const [theme] = useState<RemoteTheme>('snow');
 
-  // Remote Mode: 'full' or 'mini'
+  // Remote Mode: 'mini' by default so it floats and covers only the remote space
   const [remoteMode, setRemoteMode] = useState<'full' | 'mini'>(() => {
-    return (localStorage.getItem('gtv_remote_mode') as 'full' | 'mini') || 'full';
+    return (localStorage.getItem('gtv_remote_mode') as 'full' | 'mini') || 'mini';
   });
 
   // Active connected Smart TV
@@ -275,17 +275,21 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative bg-slate-950/40">
+    <div
+      className={`min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative ${
+        remoteMode === 'mini' ? 'pointer-events-none bg-transparent' : 'bg-black/35 backdrop-blur-[2px]'
+      }`}
+    >
       {/* 
         NO WEBSITE HEADER.
         NO OUTSIDE BUTTONS.
-        NO CARDS OUTSIDE THE REMOTE.
-        ONLY THE PRISTINE WHITE REMOTE APPEARS.
+        NO FULLSCREEN COVERAGE IN FLOATING MINI MODE.
+        Only the remote takes up space, rest of screen remains clear.
       */}
 
       {/* Voice Search Floating Toast (Appears over the remote when voice search is active) */}
       {isVoiceActive && (
-        <div className="fixed top-8 z-50 px-5 py-3 rounded-2xl bg-white/95 text-slate-800 border border-slate-300 shadow-2xl flex items-center gap-3 backdrop-blur-md animate-in fade-in slide-in-from-top-3">
+        <div className="fixed top-8 z-50 pointer-events-auto px-5 py-3 rounded-2xl bg-white/95 text-slate-800 border border-slate-300 shadow-2xl flex items-center gap-3 backdrop-blur-md animate-in fade-in slide-in-from-top-3">
           <GoogleDots className="w-6 h-6" active={true} />
           <div className="text-xs font-semibold">
             {voiceTranscript ? (
@@ -299,12 +303,41 @@ export default function App() {
 
       {/* FULL REMOTE MODE: Only the white remote body appears */}
       {remoteMode === 'full' && (
-        <GoogleTVRemote
+        <div className="pointer-events-auto">
+          <GoogleTVRemote
+            theme={theme}
+            shortcut1={shortcut1}
+            shortcut2={shortcut2}
+            onUpdateShortcuts={handleSaveShortcuts}
+            onLaunchApp={handleLaunchApp}
+            onDpadPress={handleDpadPress}
+            onSelectPress={handleSelectPress}
+            onBackPress={handleBackPress}
+            onHomePress={handleHomePress}
+            onVoicePress={handleVoicePress}
+            onMutePress={handleMutePress}
+            onPowerPress={handlePowerPress}
+            onInputPress={handleInputPress}
+            onVolumeChange={handleVolumeChange}
+            onSwitchToMini={() => setRemoteMode('mini')}
+            onOpenKeyboard={() => setKeyboardDrawerOpen(true)}
+            onOpenDeviceManager={() => setDeviceModalOpen(true)}
+            isListening={isVoiceActive}
+            connectedDevice={connectedDevice}
+          />
+        </div>
+      )}
+
+      {/* 
+        MINI REMOTE MODE:
+        Nothing on screen except the draggable white mini remote floating in the corner!
+        The rest of the screen is 100% transparent and allows clicks/touches behind it.
+      */}
+      <div className="pointer-events-auto">
+        <MiniRemote
+          isOpen={remoteMode === 'mini'}
           theme={theme}
-          shortcut1={shortcut1}
-          shortcut2={shortcut2}
-          onUpdateShortcuts={handleSaveShortcuts}
-          onLaunchApp={handleLaunchApp}
+          onExpand={() => setRemoteMode('full')}
           onDpadPress={handleDpadPress}
           onSelectPress={handleSelectPress}
           onBackPress={handleBackPress}
@@ -312,51 +345,28 @@ export default function App() {
           onVoicePress={handleVoicePress}
           onMutePress={handleMutePress}
           onPowerPress={handlePowerPress}
-          onInputPress={handleInputPress}
           onVolumeChange={handleVolumeChange}
-          onSwitchToMini={() => setRemoteMode('mini')}
-          onOpenKeyboard={() => setKeyboardDrawerOpen(true)}
-          onOpenDeviceManager={() => setDeviceModalOpen(true)}
           isListening={isVoiceActive}
-          connectedDevice={connectedDevice}
+          isTVOn={true}
         />
-      )}
-
-      {/* 
-        MINI REMOTE MODE:
-        Nothing on screen except the draggable white mini remote floating in the corner!
-        Users can use other apps at the same time and drag it anywhere on screen.
-      */}
-      <MiniRemote
-        isOpen={remoteMode === 'mini'}
-        theme={theme}
-        onExpand={() => setRemoteMode('full')}
-        onDpadPress={handleDpadPress}
-        onSelectPress={handleSelectPress}
-        onBackPress={handleBackPress}
-        onHomePress={handleHomePress}
-        onVoicePress={handleVoicePress}
-        onMutePress={handleMutePress}
-        onPowerPress={handlePowerPress}
-        onVolumeChange={handleVolumeChange}
-        isListening={isVoiceActive}
-        isTVOn={true}
-      />
+      </div>
 
       {/* MODALS: Open seamlessly over the remote when triggered from INSIDE the remote */}
-      <DeviceManagerModal
-        isOpen={deviceModalOpen}
-        onClose={() => setDeviceModalOpen(false)}
-        activeDevice={connectedDevice}
-        onDeviceChange={setConnectedDevice}
-        commandLogs={commandLogs}
-      />
+      <div className="pointer-events-auto">
+        <DeviceManagerModal
+          isOpen={deviceModalOpen}
+          onClose={() => setDeviceModalOpen(false)}
+          activeDevice={connectedDevice}
+          onDeviceChange={setConnectedDevice}
+          commandLogs={commandLogs}
+        />
 
-      <TVKeyboardDrawer
-        isOpen={keyboardDrawerOpen}
-        onClose={() => setKeyboardDrawerOpen(false)}
-        onSendText={handleSendText}
-      />
+        <TVKeyboardDrawer
+          isOpen={keyboardDrawerOpen}
+          onClose={() => setKeyboardDrawerOpen(false)}
+          onSendText={handleSendText}
+        />
+      </div>
     </div>
   );
 }
