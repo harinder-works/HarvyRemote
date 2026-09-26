@@ -60,23 +60,72 @@ export function MiniRemote({
     }
   }, [position]);
 
-  // Keep inside viewport on window resize
+  // Sync bounding box with native Android overlay bridge
   useEffect(() => {
-    const handleResize = () => {
-      setPosition((prev) => {
-        if (!prev) return null;
-        const width = 184;
-        const height = 350;
-        const clampedX = Math.min(Math.max(12, prev.x), window.innerWidth - width - 12);
-        const clampedY = Math.min(Math.max(12, prev.y), window.innerHeight - height - 12);
-        return { x: clampedX, y: clampedY };
-      });
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    if (typeof window !== 'undefined' && (window as any).AndroidOverlayBridge) {
+      if (isOpen && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const density = window.devicePixelRatio || 1;
+        try {
+          (window as any).AndroidOverlayBridge.updateRemoteBounds(
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.bottom,
+            density
+          );
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [isOpen, position]);
+
+  // Touch-based dragging for rock-solid Android responsiveness
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      const touch = e.touches[0];
+      const currentX = position?.x ?? (window.innerWidth - 200);
+      const currentY = position?.y ?? (window.innerHeight - 370);
+
+      dragStartRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        initialX: currentX,
+        initialY: currentY,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !dragStartRef.current || e.touches.length === 0) return;
+    const touch = e.touches[0];
+
+    const deltaX = touch.clientX - dragStartRef.current.startX;
+    const deltaY = touch.clientY - dragStartRef.current.startY;
+
+    const newX = dragStartRef.current.initialX + deltaX;
+    const newY = dragStartRef.current.initialY + deltaY;
+
+    const width = 184;
+    const height = 350;
+    const clampedX = Math.min(Math.max(8, newX), window.innerWidth - width - 8);
+    const clampedY = Math.min(Math.max(8, newY), window.innerHeight - height - 8);
+
+    setPosition({ x: clampedX, y: clampedY });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+  };
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return; // Handled by TouchEvent for Android
     const target = e.target as HTMLElement;
     if (target.closest('button')) return;
 
@@ -97,6 +146,7 @@ export function MiniRemote({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (e.pointerType === 'touch') return;
       if (!isDragging || !dragStartRef.current) return;
 
       const deltaX = e.clientX - dragStartRef.current.startX;
@@ -116,6 +166,7 @@ export function MiniRemote({
   );
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
     if (isDragging && containerRef.current) {
       try {
         containerRef.current.releasePointerCapture(e.pointerId);
@@ -133,6 +184,10 @@ export function MiniRemote({
   return (
     <div
       ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -145,11 +200,13 @@ export function MiniRemote({
         isDragging ? 'shadow-sky-500/30 ring-2 ring-sky-400 cursor-grabbing' : 'cursor-grab'
       }`}
     >
-      {/* Drag Grip Handle & Top Controls */}
-      <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-black/10">
-        <div className="flex items-center gap-1.5 pl-1.5">
-          <GripHorizontal className="w-4 h-4 text-slate-400" />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mini</span>
+      {/* Drag Grip Handle & Top Controls (Primary drag target) */}
+      <div
+        className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-black/10 cursor-grab active:cursor-grabbing select-none"
+      >
+        <div className="flex items-center gap-1.5 pl-1.5 py-1">
+          <GripHorizontal className="w-5 h-5 text-slate-500 animate-pulse" />
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">Drag</span>
         </div>
 
         <div className="flex items-center gap-1">
