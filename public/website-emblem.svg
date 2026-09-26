@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 62" fill="currentColor">
+  <defs>
+    <mask id="remoteEmblemMaskFile">
+      <rect width="100" height="62" fill="white" />
+      <polygon points="49.5,39 53.5,35 44.5,53 40.5,49" fill="black" />
+    </mask>
+  </defs>
+  <path fill-rule="evenodd" d="M 33.5,3.5 A 27.5,27.5 0 1,0 33.5,58.5 A 27.5,27.5 0 1,0 33.5,3.5 Z M 33.5,15 A 16,16 0 1,1 33.5,47 A 16,16 0 1,1 33.5,15 Z" />
+  <g mask="url(#remoteEmblemMaskFile)">
+    <path fill-rule="evenodd" d="M 66.5,3.5 A 27.5,27.5 0 1,0 66.5,58.5 A 27.5,27.5 0 1,0 66.5,3.5 Z M 66.5,15 A 16,16 0 1,1 66.5,47 A 16,16 0 1,1 66.5,15 Z" />
+  </g>
+  <circle cx="66.5" cy="31" r="8.8" />
+</svg>

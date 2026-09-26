@@ -1,0 +1,15 @@
+{
+  "appId": "com.googletv.companion.remote",
+  "appName": "Google TV Remote",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": true,
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}
