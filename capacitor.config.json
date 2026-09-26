@@ -1,6 +1,6 @@
 {
-  "appId": "com.googletv.companion.remote",
-  "appName": "Google TV Remote",
+  "appId": "com.harvy.remote",
+  "appName": "HarvyRemote",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {

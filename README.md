@@ -60,6 +60,35 @@ npm run build
 npm run preview
 ```
 
+### 📱 Generating Android APK
+
+#### Method 1: Automatically on GitHub (Recommended)
+This repository includes a preconfigured GitHub Actions workflow (`.github/workflows/build-apk.yml`):
+1. Go to the **Actions** tab in your GitHub repository: [github.com/harinder-works/HarvyRemote/actions](https://github.com/harinder-works/HarvyRemote/actions).
+2. Select **Build Android APK** from the left sidebar.
+3. Click **Run workflow** -> **Run workflow**.
+4. Once completed (approx. 2-3 mins), click on the workflow run.
+5. Download the `HarvyRemote-Debug-APK` zip file under the **Artifacts** section at the bottom.
+6. Unzip to get `app-debug.apk` and transfer/install it directly on any Android phone or tablet!
+
+#### Method 2: Locally on your computer
+```bash
+# 1. Install dependencies and build web assets
+npm install
+npm run build
+
+# 2. Initialize and sync Android platform
+npx cap add android
+npx cap sync android
+
+# 3. Open in Android Studio to run or generate signed APK
+npx cap open android
+# OR build directly via Gradle:
+cd android && ./gradlew assembleDebug
+# The APK will be located at:
+# android/app/build/outputs/apk/debug/app-debug.apk
+```
+
 ## 🛠 Tech Stack
 
 - **Framework**: React 19 + TypeScript
