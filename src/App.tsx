@@ -20,16 +20,13 @@ import {
 import { GoogleDots } from './components/BrandIcons';
 
 export default function App() {
-  const isNativeOverlay = typeof window !== 'undefined' && Boolean((window as any).AndroidOverlayBridge);
-
   // Always the classic white (Snow) Google TV remote
   const [theme] = useState<RemoteTheme>('snow');
 
-  // Remote Mode: 'mini' when running inside Android overlay bridge; 'full' on web/PWA by default
+  // Remote Mode: 'full' by default, or 'mini' if toggled
   const [remoteMode, setRemoteMode] = useState<'full' | 'mini'>(() => {
     const saved = localStorage.getItem('gtv_remote_mode') as 'full' | 'mini' | null;
-    if (saved) return saved;
-    return isNativeOverlay ? 'mini' : 'full';
+    return saved || 'full';
   });
 
   // Active connected Smart TV
@@ -214,21 +211,6 @@ export default function App() {
     }
   };
 
-  // When modals open in Android overlay bridge, clear bounds so touches reach the dialog
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).AndroidOverlayBridge) {
-      if (deviceModalOpen || keyboardDrawerOpen) {
-        try {
-          (window as any).AndroidOverlayBridge.clearRemoteBounds();
-        } catch {
-          // ignore
-        }
-      } else {
-        // Trigger resize event so active remote re-registers its bounding box
-        window.dispatchEvent(new Event('resize'));
-      }
-    }
-  }, [deviceModalOpen, keyboardDrawerOpen]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -296,11 +278,7 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative ${
-        isNativeOverlay
-          ? 'bg-transparent pointer-events-none'
-          : 'bg-radial from-slate-900/90 via-slate-950 to-black text-slate-100 pointer-events-auto overflow-hidden'
-      }`}
+      className="min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative bg-radial from-slate-900/90 via-slate-950 to-black text-slate-100 pointer-events-auto overflow-hidden"
     >
       {/* 
         NO WEBSITE HEADER.

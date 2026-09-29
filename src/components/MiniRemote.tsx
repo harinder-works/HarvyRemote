@@ -60,26 +60,6 @@ export function MiniRemote({
     }
   }, [position]);
 
-  // Sync bounding box with native Android overlay bridge
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).AndroidOverlayBridge) {
-      if (isOpen && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const density = window.devicePixelRatio || 1;
-        try {
-          (window as any).AndroidOverlayBridge.updateRemoteBounds(
-            rect.left,
-            rect.top,
-            rect.right,
-            rect.bottom,
-            density
-          );
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }, [isOpen, position]);
 
   // Touch-based dragging for rock-solid Android responsiveness
   const handleTouchStart = (e: React.TouchEvent) => {

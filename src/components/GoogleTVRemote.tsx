@@ -296,26 +296,6 @@ export function GoogleTVRemote({
     }
   }, [position]);
 
-  // Sync bounding box with native Android overlay bridge so touches outside remote pass through
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).AndroidOverlayBridge) {
-      if (fullRemoteRef.current) {
-        const rect = fullRemoteRef.current.getBoundingClientRect();
-        const density = window.devicePixelRatio || 1;
-        try {
-          (window as any).AndroidOverlayBridge.updateRemoteBounds(
-            rect.left,
-            rect.top,
-            rect.right,
-            rect.bottom,
-            density
-          );
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }, [position]);
 
   // Touch-based dragging for full remote
   const handleTouchStart = (e: React.TouchEvent) => {
