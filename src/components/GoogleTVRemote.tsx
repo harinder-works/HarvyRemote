@@ -285,6 +285,7 @@ export function GoogleTVRemote({
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const latestPosRef = useRef<{ x: number; y: number } | null>(null);
   const fullRemoteRef = useRef<HTMLDivElement>(null);
 
   // Initialize position centered horizontally or nicely placed
@@ -293,9 +294,9 @@ export function GoogleTVRemote({
       const defaultX = Math.max(16, (window.innerWidth - 220) / 2);
       const defaultY = Math.max(16, (window.innerHeight - 510) / 2);
       setPosition({ x: defaultX, y: defaultY });
+      latestPosRef.current = { x: defaultX, y: defaultY };
     }
   }, [position]);
-
 
   // Touch-based dragging for full remote
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -305,8 +306,8 @@ export function GoogleTVRemote({
     if (e.touches.length === 1) {
       setIsDragging(true);
       const touch = e.touches[0];
-      const currentX = position?.x ?? Math.max(16, (window.innerWidth - 220) / 2);
-      const currentY = position?.y ?? Math.max(16, (window.innerHeight - 510) / 2);
+      const currentX = latestPosRef.current?.x ?? position?.x ?? Math.max(16, (window.innerWidth - 220) / 2);
+      const currentY = latestPosRef.current?.y ?? position?.y ?? Math.max(16, (window.innerHeight - 510) / 2);
 
       dragStartRef.current = {
         startX: touch.clientX,
@@ -332,12 +333,18 @@ export function GoogleTVRemote({
     const clampedX = Math.min(Math.max(4, newX), window.innerWidth - width - 4);
     const clampedY = Math.min(Math.max(4, newY), window.innerHeight - height - 4);
 
-    setPosition({ x: clampedX, y: clampedY });
+    latestPosRef.current = { x: clampedX, y: clampedY };
+    if (fullRemoteRef.current) {
+      fullRemoteRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+    }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
     dragStartRef.current = null;
+    if (latestPosRef.current) {
+      setPosition(latestPosRef.current);
+    }
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -349,8 +356,8 @@ export function GoogleTVRemote({
     setIsDragging(true);
     fullRemoteRef.current.setPointerCapture(e.pointerId);
 
-    const currentX = position?.x ?? Math.max(16, (window.innerWidth - 220) / 2);
-    const currentY = position?.y ?? Math.max(16, (window.innerHeight - 510) / 2);
+    const currentX = latestPosRef.current?.x ?? position?.x ?? Math.max(16, (window.innerWidth - 220) / 2);
+    const currentY = latestPosRef.current?.y ?? position?.y ?? Math.max(16, (window.innerHeight - 510) / 2);
 
     dragStartRef.current = {
       startX: e.clientX,
@@ -376,7 +383,10 @@ export function GoogleTVRemote({
       const clampedX = Math.min(Math.max(4, newX), window.innerWidth - width - 4);
       const clampedY = Math.min(Math.max(4, newY), window.innerHeight - height - 4);
 
-      setPosition({ x: clampedX, y: clampedY });
+      latestPosRef.current = { x: clampedX, y: clampedY };
+      if (fullRemoteRef.current) {
+        fullRemoteRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+      }
     },
     [isDragging]
   );
@@ -391,6 +401,9 @@ export function GoogleTVRemote({
       }
       setIsDragging(false);
       dragStartRef.current = null;
+      if (latestPosRef.current) {
+        setPosition(latestPosRef.current);
+      }
     }
   };
 
@@ -464,10 +477,11 @@ export function GoogleTVRemote({
                 sound.playClick('action');
                 onSwitchToMini();
               }}
-              title="Minimize to Floating Mini Remote"
-              className="p-1 rounded-full text-slate-500 hover:text-slate-900 hover:bg-black/10 transition-colors"
+              title="Float Over Other Apps"
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold text-sky-600 bg-sky-500/10 hover:bg-sky-500/20 flex items-center gap-1 transition-colors cursor-pointer"
             >
-              <Minimize2 className="w-3.5 h-3.5" />
+              <Minimize2 className="w-3 h-3" />
+              <span>Float Over Apps</span>
             </button>
           </div>
           {/* TOP BEZEL INSIDE REMOTE: TV Status, IR LED, and Mode/Mini Switch */}

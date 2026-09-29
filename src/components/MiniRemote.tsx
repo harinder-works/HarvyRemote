@@ -49,6 +49,7 @@ export function MiniRemote({
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const latestPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Initialize position to bottom right corner once mounted
@@ -57,9 +58,9 @@ export function MiniRemote({
       const defaultX = Math.max(16, window.innerWidth - 200);
       const defaultY = Math.max(16, window.innerHeight - 370);
       setPosition({ x: defaultX, y: defaultY });
+      latestPosRef.current = { x: defaultX, y: defaultY };
     }
   }, [position]);
-
 
   // Touch-based dragging for rock-solid Android responsiveness
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -69,8 +70,8 @@ export function MiniRemote({
     if (e.touches.length === 1) {
       setIsDragging(true);
       const touch = e.touches[0];
-      const currentX = position?.x ?? (window.innerWidth - 200);
-      const currentY = position?.y ?? (window.innerHeight - 370);
+      const currentX = latestPosRef.current?.x ?? position?.x ?? (window.innerWidth - 200);
+      const currentY = latestPosRef.current?.y ?? position?.y ?? (window.innerHeight - 370);
 
       dragStartRef.current = {
         startX: touch.clientX,
@@ -96,12 +97,18 @@ export function MiniRemote({
     const clampedX = Math.min(Math.max(8, newX), window.innerWidth - width - 8);
     const clampedY = Math.min(Math.max(8, newY), window.innerHeight - height - 8);
 
-    setPosition({ x: clampedX, y: clampedY });
+    latestPosRef.current = { x: clampedX, y: clampedY };
+    if (containerRef.current) {
+      containerRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+    }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
     dragStartRef.current = null;
+    if (latestPosRef.current) {
+      setPosition(latestPosRef.current);
+    }
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -113,8 +120,8 @@ export function MiniRemote({
     setIsDragging(true);
     containerRef.current.setPointerCapture(e.pointerId);
 
-    const currentX = position?.x ?? (window.innerWidth - 200);
-    const currentY = position?.y ?? (window.innerHeight - 370);
+    const currentX = latestPosRef.current?.x ?? position?.x ?? (window.innerWidth - 200);
+    const currentY = latestPosRef.current?.y ?? position?.y ?? (window.innerHeight - 370);
 
     dragStartRef.current = {
       startX: e.clientX,
@@ -140,7 +147,10 @@ export function MiniRemote({
       const clampedX = Math.min(Math.max(8, newX), window.innerWidth - width - 8);
       const clampedY = Math.min(Math.max(8, newY), window.innerHeight - height - 8);
 
-      setPosition({ x: clampedX, y: clampedY });
+      latestPosRef.current = { x: clampedX, y: clampedY };
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+      }
     },
     [isDragging]
   );
@@ -155,6 +165,9 @@ export function MiniRemote({
       }
       setIsDragging(false);
       dragStartRef.current = null;
+      if (latestPosRef.current) {
+        setPosition(latestPosRef.current);
+      }
     }
   };
 

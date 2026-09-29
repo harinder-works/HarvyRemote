@@ -23,11 +23,38 @@ export default function App() {
   // Always the classic white (Snow) Google TV remote
   const [theme] = useState<RemoteTheme>('snow');
 
-  // Remote Mode: 'full' by default, or 'mini' if toggled
+  // Remote Mode: 'full' by default, or 'mini' if toggled or in PiP
   const [remoteMode, setRemoteMode] = useState<'full' | 'mini'>(() => {
     const saved = localStorage.getItem('gtv_remote_mode') as 'full' | 'mini' | null;
     return saved || 'full';
   });
+
+  const [isPip, setIsPip] = useState(false);
+
+  // Listen for native Android Picture-in-Picture mode events
+  useEffect(() => {
+    const handlePip = (e: any) => {
+      const pipActive = Boolean(e.detail?.isPip);
+      setIsPip(pipActive);
+      if (pipActive) {
+        setRemoteMode('mini');
+      }
+    };
+    window.addEventListener('pip-mode-changed', handlePip);
+    return () => window.removeEventListener('pip-mode-changed', handlePip);
+  }, []);
+
+  const handleEnterFloating = () => {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
+      try {
+        (window as any).AndroidNativeBridge.enterPip();
+      } catch {
+        setRemoteMode('mini');
+      }
+    } else {
+      setRemoteMode('mini');
+    }
+  };
 
   // Active connected Smart TV
   const [connectedDevice, setConnectedDevice] = useState<SmartTVDevice | null>(() => {
@@ -278,12 +305,14 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen w-full flex items-center justify-center p-2 sm:p-4 select-none relative bg-radial from-slate-900/90 via-slate-950 to-black text-slate-100 pointer-events-auto overflow-hidden"
+      className={`min-h-screen w-full flex items-center justify-center p-2 select-none relative pointer-events-auto overflow-hidden ${
+        isPip ? 'bg-transparent' : 'bg-[#090D16] text-slate-100'
+      }`}
     >
       {/* 
         NO WEBSITE HEADER.
         NO OUTSIDE BUTTONS.
-        NO DARK FULLSCREEN OVERLAY OR BACKGROUND.
+        NO HEAVY BACKGROUND OVERLAYS.
         Only the remote itself captures touches and takes up physical space.
       */}
 
@@ -319,7 +348,7 @@ export default function App() {
             onPowerPress={handlePowerPress}
             onInputPress={handleInputPress}
             onVolumeChange={handleVolumeChange}
-            onSwitchToMini={() => setRemoteMode('mini')}
+            onSwitchToMini={handleEnterFloating}
             onOpenKeyboard={() => setKeyboardDrawerOpen(true)}
             onOpenDeviceManager={() => setDeviceModalOpen(true)}
             isListening={isVoiceActive}

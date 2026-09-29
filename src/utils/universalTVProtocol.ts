@@ -431,18 +431,23 @@ class UniversalTVClient {
       }
     }
 
-    // Direct HTTP/WebSocket transmission
+    // Direct HTTP/WebSocket transmission (non-blocking with fast abort)
     try {
-      fetch('/api/tv/send-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brand,
-          ip,
-          action,
-          payload,
-        }),
-      }).catch(() => {});
+      if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.hostname.includes('localhost')) {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 120);
+        fetch('/api/tv/send-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brand,
+            ip,
+            action,
+            payload,
+          }),
+          signal: controller.signal,
+        }).catch(() => {}).finally(() => clearTimeout(tid));
+      }
     } catch {
       // handled
     }
@@ -488,11 +493,16 @@ class UniversalTVClient {
     }
 
     try {
-      fetch('/api/tv/launch-app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand, ip, targetApp, payload }),
-      }).catch(() => {});
+      if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.hostname.includes('localhost')) {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 120);
+        fetch('/api/tv/launch-app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brand, ip, targetApp, payload }),
+          signal: controller.signal,
+        }).catch(() => {}).finally(() => clearTimeout(tid));
+      }
     } catch {
       // handled
     }

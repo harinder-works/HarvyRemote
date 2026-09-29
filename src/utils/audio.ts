@@ -29,66 +29,68 @@ class SoundController {
   public playClick(type: 'dpad' | 'button' | 'action' | 'soft' = 'button') {
     if (this.hapticsEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
-        navigator.vibrate(type === 'dpad' ? 8 : 12);
+        navigator.vibrate(type === 'dpad' ? 6 : 10);
       } catch {
         // ignore
       }
     }
 
-    const ctx = this.getContext();
-    if (!ctx) return;
+    setTimeout(() => {
+      const ctx = this.getContext();
+      if (!ctx) return;
 
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      try {
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-      if (type === 'dpad') {
-        // Crisp tactile switch tick
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(650, now);
-        osc.frequency.exponentialRampToValueAtTime(140, now + 0.025);
+        if (type === 'dpad') {
+          // Crisp tactile switch tick
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(650, now);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 0.025);
 
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
 
-        osc.start(now);
-        osc.stop(now + 0.026);
-      } else if (type === 'action') {
-        // Solid mechanical plunger sound
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(420, now);
-        osc.frequency.exponentialRampToValueAtTime(80, now + 0.04);
+          osc.start(now);
+          osc.stop(now + 0.026);
+        } else if (type === 'action') {
+          // Solid mechanical plunger sound
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.04);
 
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
 
-        osc.start(now);
-        osc.stop(now + 0.042);
-      } else {
-        // Normal soft rubber dome click
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(520, now);
-        osc.frequency.exponentialRampToValueAtTime(120, now + 0.03);
+          osc.start(now);
+          osc.stop(now + 0.042);
+        } else {
+          // Normal soft rubber dome click
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(120, now + 0.03);
 
-        gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
 
-        osc.start(now);
-        osc.stop(now + 0.032);
+          osc.start(now);
+          osc.stop(now + 0.032);
+        }
+      } catch {
+        // Audio error suppressed
       }
-    } catch {
-      // Audio error suppressed
-    }
+    }, 0);
   }
 
   public playAssistantChime() {
