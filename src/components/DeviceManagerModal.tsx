@@ -7,6 +7,7 @@ import {
   Plus,
   ShieldCheck,
   Terminal,
+  Trash2,
 } from 'lucide-react';
 import {
   SmartTVDevice,
@@ -26,6 +27,63 @@ interface DeviceManagerModalProps {
   commandLogs: UniversalCommandLog[];
 }
 
+const DEFAULT_DEVICES: SmartTVDevice[] = [
+  {
+    id: 'chromecast-living-room',
+    name: 'Living Room TV',
+    brand: 'google_tv',
+    ip: '192.168.1.105',
+    port: 6467,
+    model: 'Google TV 4K',
+    isPaired: true,
+    isConnected: true,
+    lastPingMs: 24,
+  },
+  {
+    id: 'samsung-qled-bedroom',
+    name: 'Bedroom Samsung TV',
+    brand: 'samsung',
+    ip: '192.168.1.118',
+    port: 8002,
+    model: 'The Frame 55" (Tizen)',
+    isPaired: true,
+    isConnected: false,
+    lastPingMs: 28,
+  },
+  {
+    id: 'lg-oled-den',
+    name: 'Den LG OLED',
+    brand: 'lg_webos',
+    ip: '192.168.1.142',
+    port: 3001,
+    model: 'OLED C3 65" (webOS)',
+    isPaired: true,
+    isConnected: false,
+    lastPingMs: 19,
+  },
+  {
+    id: 'tcl-roku-basement',
+    name: 'Basement Roku TV',
+    brand: 'roku',
+    ip: '192.168.1.88',
+    port: 8060,
+    model: 'Roku TV 50"',
+    isPaired: true,
+    isConnected: false,
+    lastPingMs: 16,
+  },
+  {
+    id: 'fire-tv-guest',
+    name: 'Guest Room Fire TV',
+    brand: 'fire_tv',
+    ip: '192.168.1.164',
+    port: 5555,
+    model: 'Fire TV Stick 4K Max',
+    isPaired: false,
+    isConnected: false,
+  },
+];
+
 export function DeviceManagerModal({
   isOpen,
   onClose,
@@ -33,62 +91,26 @@ export function DeviceManagerModal({
   onDeviceChange,
   commandLogs,
 }: DeviceManagerModalProps) {
-  const [deviceList, setDeviceList] = useState<SmartTVDevice[]>([
-    {
-      id: 'chromecast-living-room',
-      name: 'Living Room TV',
-      brand: 'google_tv',
-      ip: '192.168.1.105',
-      port: 6467,
-      model: 'Google TV 4K',
-      isPaired: true,
-      isConnected: true,
-      lastPingMs: 24,
-    },
-    {
-      id: 'samsung-qled-bedroom',
-      name: 'Bedroom Samsung TV',
-      brand: 'samsung',
-      ip: '192.168.1.118',
-      port: 8002,
-      model: 'The Frame 55" (Tizen)',
-      isPaired: true,
-      isConnected: false,
-      lastPingMs: 28,
-    },
-    {
-      id: 'lg-oled-den',
-      name: 'Den LG OLED',
-      brand: 'lg_webos',
-      ip: '192.168.1.142',
-      port: 3001,
-      model: 'OLED C3 65" (webOS)',
-      isPaired: true,
-      isConnected: false,
-      lastPingMs: 19,
-    },
-    {
-      id: 'tcl-roku-basement',
-      name: 'Basement Roku TV',
-      brand: 'roku',
-      ip: '192.168.1.88',
-      port: 8060,
-      model: 'Roku TV 50"',
-      isPaired: true,
-      isConnected: false,
-      lastPingMs: 16,
-    },
-    {
-      id: 'fire-tv-guest',
-      name: 'Guest Room Fire TV',
-      brand: 'fire_tv',
-      ip: '192.168.1.164',
-      port: 5555,
-      model: 'Fire TV Stick 4K Max',
-      isPaired: false,
-      isConnected: false,
-    },
-  ]);
+  const [deviceList, setDeviceList] = useState<SmartTVDevice[]>(() => {
+    try {
+      const saved = localStorage.getItem('saved_smart_tv_devices');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_DEVICES;
+  });
+
+  const saveDevices = (list: SmartTVDevice[]) => {
+    setDeviceList(list);
+    try {
+      localStorage.setItem('saved_smart_tv_devices', JSON.stringify(list));
+    } catch {
+      // ignore
+    }
+  };
 
   const [isScanning, setIsScanning] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -124,7 +146,7 @@ export function DeviceManagerModal({
       isConnected: d.id === dev.id,
       isPaired: true,
     }));
-    setDeviceList(updated);
+    saveDevices(updated);
     const target = updated.find((d) => d.id === dev.id) || null;
     onDeviceChange(target);
     universalTV.setActiveDevice(target);
@@ -133,9 +155,20 @@ export function DeviceManagerModal({
   const handleDisconnect = () => {
     sound.playClick('soft');
     const updated = deviceList.map((d) => ({ ...d, isConnected: false }));
-    setDeviceList(updated);
+    saveDevices(updated);
     onDeviceChange(null);
     universalTV.setActiveDevice(null);
+  };
+
+  const handleDeleteDevice = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    sound.playClick('soft');
+    const updated = deviceList.filter((d) => d.id !== id);
+    saveDevices(updated);
+    if (activeDevice?.id === id) {
+      onDeviceChange(null);
+      universalTV.setActiveDevice(null);
+    }
   };
 
   const handlePairSubmit = (e: React.FormEvent) => {
@@ -148,7 +181,7 @@ export function DeviceManagerModal({
         ? { ...d, isPaired: true, isConnected: true }
         : { ...d, isConnected: false }
     );
-    setDeviceList(updated);
+    saveDevices(updated);
     const target = updated.find((d) => d.id === showPairDialog.id) || null;
     onDeviceChange(target);
     universalTV.setActiveDevice(target);
@@ -174,7 +207,7 @@ export function DeviceManagerModal({
     };
 
     const updated = [newDev, ...deviceList.map((d) => ({ ...d, isConnected: false }))];
-    setDeviceList(updated);
+    saveDevices(updated);
     onDeviceChange(newDev);
     universalTV.setActiveDevice(newDev);
     setShowAddForm(false);
@@ -280,7 +313,7 @@ export function DeviceManagerModal({
                 >
                   <input
                     type="text"
-                    placeholder="TV Name (e.g. Sony TV)"
+                    placeholder="TV Name (e.g. Living Room Bravia)"
                     value={newDeviceName}
                     onChange={(e) => setNewDeviceName(e.target.value)}
                     className="w-full px-3 py-1.5 bg-white rounded-xl border border-slate-300 text-slate-800 text-xs font-medium"
@@ -294,17 +327,30 @@ export function DeviceManagerModal({
                     className="w-full px-3 py-1.5 bg-white rounded-xl border border-slate-300 text-slate-800 text-xs font-medium"
                     required
                   />
+                  <select
+                    value={newDeviceBrand}
+                    onChange={(e) => setNewDeviceBrand(e.target.value as TVBrand)}
+                    className="w-full px-3 py-1.5 bg-white rounded-xl border border-slate-300 text-slate-800 text-xs font-medium"
+                  >
+                    <option value="google_tv">Google TV / Android TV</option>
+                    <option value="samsung">Samsung Smart TV (Tizen)</option>
+                    <option value="lg_webos">LG Smart TV (webOS)</option>
+                    <option value="roku">Roku TV / Streaming Stick</option>
+                    <option value="fire_tv">Amazon Fire TV</option>
+                    <option value="vizio">Vizio SmartCast</option>
+                    <option value="universal">Universal Smart TV</option>
+                  </select>
                   <div className="flex justify-end gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => setShowAddForm(false)}
-                      className="px-2 py-1 text-[11px] text-slate-500"
+                      className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-800"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-3 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px]"
+                      className="px-3 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px] hover:bg-slate-800 cursor-pointer"
                     >
                       Save TV
                     </button>
@@ -317,16 +363,16 @@ export function DeviceManagerModal({
                 const isCurrent = activeDevice?.id === dev.id;
                 const brandMeta = TV_BRAND_CONFIG[dev.brand];
                 return (
-                  <button
+                  <div
                     key={dev.id}
                     onClick={() => handleConnectDevice(dev)}
-                    className={`w-full h-13 rounded-2xl border remote-button-shadow flex items-center justify-between px-3 text-left transition-all ${
+                    className={`w-full min-h-[52px] rounded-2xl border remote-button-shadow flex items-center justify-between px-3 text-left transition-all cursor-pointer ${
                       isCurrent
                         ? 'bg-white border-sky-400 ring-2 ring-sky-400/40'
                         : 'bg-[#E1E5EA] border-[#D3D8E0] hover:bg-[#D8DCE2]'
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 py-1.5">
                       <div className="text-xs font-bold text-slate-800 truncate flex items-center gap-1.5">
                         {dev.name}
                         {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
@@ -336,18 +382,29 @@ export function DeviceManagerModal({
                       </div>
                     </div>
 
-                    <div className="shrink-0 pl-2">
+                    <div className="shrink-0 flex items-center gap-1.5 pl-2">
                       {isCurrent ? (
                         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white">
                           Active
                         </span>
                       ) : (
-                        <span className="text-[10px] text-slate-400 font-semibold">
+                        <span className="text-[10px] text-slate-500 font-semibold hover:text-slate-900">
                           Connect
                         </span>
                       )}
+
+                      {deviceList.length > 1 && (
+                        <button
+                          type="button"
+                          title="Remove TV"
+                          onClick={(e) => handleDeleteDevice(e, dev.id)}
+                          className="w-6 h-6 rounded-full hover:bg-black/10 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </>
