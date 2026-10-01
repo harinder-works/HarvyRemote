@@ -110,9 +110,16 @@ export default function App() {
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const speechRecognizerRef = useRef<ReturnType<typeof createSpeechRecognizer> | null>(null);
 
-  // Sync remote mode
+  // Sync remote mode and update native window bounds
   useEffect(() => {
     localStorage.setItem('gtv_remote_mode', remoteMode);
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.setWindowMode) {
+      try {
+        (window as any).AndroidNativeBridge.setWindowMode(remoteMode);
+      } catch {
+        // ignore
+      }
+    }
   }, [remoteMode]);
 
   // Subscribe to command transmissions only when Device Manager is open
@@ -306,9 +313,7 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen w-full flex items-center justify-center p-2 select-none relative pointer-events-auto overflow-hidden ${
-        isPip ? 'bg-transparent' : 'bg-[#090D16] text-slate-100'
-      }`}
+      className="w-full h-full min-h-screen flex items-center justify-center p-0 m-0 select-none relative bg-transparent text-slate-100 pointer-events-auto overflow-hidden"
     >
       {/* 
         NO WEBSITE HEADER.

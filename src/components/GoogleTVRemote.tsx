@@ -328,6 +328,17 @@ export function GoogleTVRemote({
     const deltaX = touch.clientX - dragStartRef.current.startX;
     const deltaY = touch.clientY - dragStartRef.current.startY;
 
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.moveWindow) {
+      try {
+        (window as any).AndroidNativeBridge.moveWindow(Math.round(deltaX), Math.round(deltaY));
+        dragStartRef.current.startX = touch.clientX;
+        dragStartRef.current.startY = touch.clientY;
+        return;
+      } catch {
+        // fallback
+      }
+    }
+
     const newX = dragStartRef.current.initialX + deltaX;
     const newY = dragStartRef.current.initialY + deltaY;
 
