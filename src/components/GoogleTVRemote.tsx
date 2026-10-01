@@ -477,10 +477,9 @@ export function GoogleTVRemote({
                 onSwitchToMini();
               }}
               title="Float Over Other Apps"
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold text-sky-600 bg-sky-500/10 hover:bg-sky-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+              className="p-1 rounded-full text-slate-500 hover:text-slate-800 hover:bg-black/10 transition-colors cursor-pointer"
             >
-              <Minimize2 className="w-3 h-3" />
-              <span>Float Over Apps</span>
+              <Minimize2 className="w-3.5 h-3.5" />
             </button>
           </div>
           {/* TOP BEZEL INSIDE REMOTE: TV Status, IR LED, and Mode/Mini Switch */}
