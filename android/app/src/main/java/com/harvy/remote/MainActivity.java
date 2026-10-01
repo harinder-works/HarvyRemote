@@ -26,11 +26,11 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
-            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#EDEDF0")));
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
-                webView.setBackgroundColor(Color.parseColor("#0B0F19"));
+                webView.setBackgroundColor(Color.parseColor("#EDEDF0"));
 
                 // Hardware compositing layer for 60/120fps UI
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -103,8 +103,8 @@ public class MainActivity extends BridgeActivity {
                     webView.setBackgroundColor(Color.TRANSPARENT);
                     getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 } else {
-                    webView.setBackgroundColor(Color.parseColor("#0B0F19"));
-                    getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
+                    webView.setBackgroundColor(Color.parseColor("#EDEDF0"));
+                    getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#EDEDF0")));
                 }
                 webView.post(() -> {
                     webView.evaluateJavascript(

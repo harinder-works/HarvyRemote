@@ -330,7 +330,7 @@ export default function App() {
       className={`w-full min-h-screen select-none ${
         isPip
           ? 'bg-transparent flex items-center justify-center p-0 overflow-hidden'
-          : 'bg-[#0B0F19] text-slate-100 flex flex-col justify-center items-center overflow-x-hidden'
+          : 'bg-[#EDEDF0] text-slate-800 flex flex-col justify-center items-center overflow-x-hidden'
       }`}
     >
       {/* 
