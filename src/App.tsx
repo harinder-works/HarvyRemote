@@ -313,7 +313,9 @@ export default function App() {
 
   return (
     <div
-      className="w-full h-full min-h-screen flex items-center justify-center p-0 m-0 select-none relative bg-transparent text-slate-100 pointer-events-auto overflow-hidden"
+      className={`w-full h-full min-h-screen flex items-center justify-center p-0 m-0 select-none relative overflow-hidden ${
+        isPip ? 'bg-transparent' : 'bg-[#090D16]'
+      }`}
     >
       {/* 
         NO WEBSITE HEADER.
