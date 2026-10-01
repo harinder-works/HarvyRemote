@@ -285,7 +285,7 @@ export function GoogleTVRemote({
   );
 
   return (
-    <div className="w-full min-h-screen flex items-center justify-center p-2 select-none overflow-y-auto">
+    <div className="w-full h-full min-h-full flex items-center justify-center p-2 select-none overflow-y-auto bg-transparent">
       {/* Remote Outer Casing Container with Side Volume Rocker */}
       <div className="relative flex items-center justify-center py-2 px-5 shrink-0">
         
