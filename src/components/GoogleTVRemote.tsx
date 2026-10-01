@@ -69,9 +69,8 @@ export function GoogleTVRemote({
   // Remote Face View: 'controls' (D-Pad Face) or 'channels' (Channels Grid Face)
   const [remoteFace, setRemoteFace] = useState<'controls' | 'channels'>('controls');
 
-  // Hardware LED state & active button depression animation
-  const [ledActive, setLedActive] = useState(false);
-  const [activeButton, setActiveButton] = useState<string | null>(null);
+  // Hardware LED ref (0ms latency, zero re-renders)
+  const ledRef = useRef<HTMLDivElement>(null);
 
   // Navigation mode for controls face: Physical D-Pad vs Swipe Trackpad
   const [controlMode, setControlMode] = useState<'dpad' | 'trackpad'>('dpad');
@@ -88,13 +87,17 @@ export function GoogleTVRemote({
   const pressTimer = useRef<number | null>(null);
   const isLongPressTriggered = useRef<boolean>(false);
 
-  const triggerLed = (buttonId?: string) => {
-    if (buttonId) {
-      setActiveButton(buttonId);
-      setTimeout(() => setActiveButton(null), 180);
+  const triggerLed = () => {
+    if (ledRef.current) {
+      ledRef.current.style.backgroundColor = '#38bdf8';
+      ledRef.current.style.boxShadow = '0 0 12px #38bdf8';
+      setTimeout(() => {
+        if (ledRef.current) {
+          ledRef.current.style.backgroundColor = '';
+          ledRef.current.style.boxShadow = '';
+        }
+      }, 160);
     }
-    setLedActive(true);
-    setTimeout(() => setLedActive(false), 220);
   };
 
   const showStatus = (text: string) => {
@@ -437,9 +440,7 @@ export function GoogleTVRemote({
               type="button"
               title="Volume Up (+)"
               onClick={() => handleVolume(5)}
-              className={`w-4 h-14 rounded-r-lg ${styles.sideRocker} border-y border-r flex items-center justify-center transition-all cursor-pointer ${
-                activeButton === 'vol-up' ? 'scale-95 brightness-90 translate-x-[-1px]' : 'hover:brightness-95'
-              }`}
+              className={`w-4 h-14 rounded-r-lg ${styles.sideRocker} border-y border-r flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:brightness-90 active:translate-x-[-1px]`}
             >
               <span className="text-[12px] font-bold leading-none select-none pl-0.5 text-slate-700">+</span>
             </button>
@@ -452,9 +453,7 @@ export function GoogleTVRemote({
               type="button"
               title="Volume Down (-)"
               onClick={() => handleVolume(-5)}
-              className={`w-4 h-14 rounded-r-lg ${styles.sideRocker} border-y border-r flex items-center justify-center transition-all cursor-pointer ${
-                activeButton === 'vol-down' ? 'scale-95 brightness-90 translate-x-[-1px]' : 'hover:brightness-95'
-              }`}
+              className={`w-4 h-14 rounded-r-lg ${styles.sideRocker} border-y border-r flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:brightness-90 active:translate-x-[-1px]`}
             >
               <span className="text-[14px] font-bold leading-none select-none pl-0.5 text-slate-700">−</span>
             </button>
@@ -506,11 +505,10 @@ export function GoogleTVRemote({
             <div className="flex items-center gap-1.5">
               <div className="w-6 h-1.5 rounded-full bg-slate-900/40 border border-black/10" />
               <div
-                className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                ref={ledRef}
+                className={`w-2 h-2 rounded-full transition-all duration-150 ${
                   isListening
                     ? 'bg-amber-400 shadow-[0_0_10px_#fbbf24] animate-pulse scale-125'
-                    : ledActive
-                    ? styles.accentLed
                     : 'bg-black/15'
                 }`}
               />
@@ -563,9 +561,7 @@ export function GoogleTVRemote({
                     <button
                       type="button"
                       onClick={() => handleDpad('up')}
-                      className={`absolute top-0 left-0 right-0 h-11 flex items-center justify-center pt-1.5 cursor-pointer text-slate-600 transition-all ${
-                        activeButton === 'dpad-up' ? 'scale-90 opacity-70' : 'hover:opacity-80 active:scale-95'
-                      }`}
+                      className="absolute top-0 left-0 right-0 h-11 flex items-center justify-center pt-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
                       title="Navigate Up"
                     >
                       <ChevronUp className="w-5 h-5 stroke-[2.5]" />
@@ -575,9 +571,7 @@ export function GoogleTVRemote({
                     <button
                       type="button"
                       onClick={() => handleDpad('down')}
-                      className={`absolute bottom-0 left-0 right-0 h-11 flex items-center justify-center pb-1.5 cursor-pointer text-slate-600 transition-all ${
-                        activeButton === 'dpad-down' ? 'scale-90 opacity-70' : 'hover:opacity-80 active:scale-95'
-                      }`}
+                      className="absolute bottom-0 left-0 right-0 h-11 flex items-center justify-center pb-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
                       title="Navigate Down"
                     >
                       <ChevronDown className="w-5 h-5 stroke-[2.5]" />
@@ -587,9 +581,7 @@ export function GoogleTVRemote({
                     <button
                       type="button"
                       onClick={() => handleDpad('left')}
-                      className={`absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center pl-1.5 cursor-pointer text-slate-600 transition-all ${
-                        activeButton === 'dpad-left' ? 'scale-90 opacity-70' : 'hover:opacity-80 active:scale-95'
-                      }`}
+                      className="absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center pl-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
                       title="Navigate Left"
                     >
                       <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
@@ -599,9 +591,7 @@ export function GoogleTVRemote({
                     <button
                       type="button"
                       onClick={() => handleDpad('right')}
-                      className={`absolute right-0 top-0 bottom-0 w-11 flex items-center justify-center pr-1.5 cursor-pointer text-slate-600 transition-all ${
-                        activeButton === 'dpad-right' ? 'scale-90 opacity-70' : 'hover:opacity-80 active:scale-95'
-                      }`}
+                      className="absolute right-0 top-0 bottom-0 w-11 flex items-center justify-center pr-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
                       title="Navigate Right"
                     >
                       <ChevronRight className="w-5 h-5 stroke-[2.5]" />
@@ -613,9 +603,7 @@ export function GoogleTVRemote({
                     type="button"
                     onClick={handleSelect}
                     title="Select / OK"
-                    className={`relative z-10 w-[58px] h-[58px] rounded-full ${styles.dpadCenter} border-2 remote-button-shadow cursor-pointer transition-all flex items-center justify-center ${
-                      activeButton === 'dpad-select' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                    }`}
+                    className={`relative z-10 w-[58px] h-[58px] rounded-full ${styles.dpadCenter} border-2 remote-button-shadow cursor-pointer transition-all flex items-center justify-center hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                   >
                     <span className="w-3.5 h-3.5 rounded-full bg-black/10 border border-white/20" />
                   </button>
@@ -642,9 +630,7 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={handleBack}
                   title="Back"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer ${
-                    activeButton === 'back' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
                 </button>
@@ -656,9 +642,7 @@ export function GoogleTVRemote({
                   title="Voice Search"
                   className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer relative overflow-hidden ${
                     isListening ? 'ring-2 ring-sky-400 bg-sky-100/60' : ''
-                  } ${
-                    activeButton === 'voice' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  } hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <GoogleDots className="w-5 h-5" active={isListening} />
                 </button>
@@ -671,9 +655,7 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={handleHome}
                   title="Home"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer ${
-                    activeButton === 'home' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <Home className="w-4 h-4 stroke-[2.2]" />
                 </button>
@@ -683,9 +665,7 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={handleMute}
                   title="Mute Audio"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer ${
-                    activeButton === 'mute' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <VolumeX className="w-4 h-4 stroke-[2.2]" />
                 </button>
@@ -709,9 +689,7 @@ export function GoogleTVRemote({
                     setRemoteFace('channels');
                   }}
                   title={`${shortcut1.name} (Hold or right-click to change)`}
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 px-2.5 transition-all cursor-pointer ${
-                    activeButton === 'app-1' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 px-2.5 transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <div style={{ color: shortcut1.brandColor }} className="shrink-0 flex items-center justify-center">
                     <AppIconRenderer iconType={shortcut1.iconType} className="w-4 h-4" />
@@ -726,7 +704,7 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={() => {
                     sound.playClick('action');
-                    triggerLed('app-2');
+                    triggerLed();
                     onLaunchApp(shortcut2);
                     showStatus(`Playing ${shortcut2.shortLabel}`);
                   }}
@@ -737,9 +715,7 @@ export function GoogleTVRemote({
                     setRemoteFace('channels');
                   }}
                   title={`${shortcut2.name} (Hold or right-click to change)`}
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 px-2.5 transition-all cursor-pointer ${
-                    activeButton === 'app-2' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 px-2.5 transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <div style={{ color: shortcut2.brandColor }} className="shrink-0 flex items-center justify-center">
                     <AppIconRenderer iconType={shortcut2.iconType} className="w-4 h-4" />
@@ -757,9 +733,7 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={handlePower}
                   title="TV Power"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-emerald-600 ${
-                    activeButton === 'power' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-emerald-600 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <Power className="w-4 h-4 stroke-[2.2]" />
                 </button>
@@ -769,9 +743,7 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={handleInput}
                   title="TV Input Source"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-700 ${
-                    activeButton === 'input' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-700 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <Tv className="w-4 h-4 stroke-[2.2]" />
                 </button>
@@ -784,13 +756,11 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={() => {
                     sound.playClick('button');
-                    triggerLed('keyboard');
+                    triggerLed();
                     onOpenKeyboard();
                   }}
                   title="Keyboard Typing for TV"
-                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900 ${
-                    activeButton === 'keyboard' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <Keyboard className="w-4 h-4" />
                 </button>
@@ -800,13 +770,11 @@ export function GoogleTVRemote({
                   type="button"
                   onClick={() => {
                     sound.playClick('button');
-                    triggerLed('apps');
+                    triggerLed();
                     setRemoteFace('channels');
                   }}
                   title="All Channels & Apps (Hotstar, Netflix, YouTube, Prime, Disney+...)"
-                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900 ${
-                    activeButton === 'apps' ? 'remote-button-pressed' : 'hover:brightness-95 active:scale-95'
-                  }`}
+                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
                 >
                   <Grid className="w-4 h-4" />
                 </button>
@@ -852,11 +820,11 @@ export function GoogleTVRemote({
                           setPromotingApp(app);
                         }}
                         title={`${app.name} (${isHomeKey ? 'Promoted to Home Screen • ' : ''}Tap to play, Hold to set Home key)`}
-                        className={`h-12 rounded-full border remote-button-shadow flex items-center justify-center relative transition-all cursor-pointer select-none active:scale-90 ${
+                        className={`h-12 rounded-full border remote-button-shadow flex items-center justify-center relative transition-all cursor-pointer select-none active:scale-90 active:remote-button-pressed ${
                           isHomeKey
                             ? 'bg-[#EBF3FE] border-sky-400 ring-2 ring-sky-400/40 shadow-sm'
                             : `${styles.button} border-[#D3D8E0]`
-                        } ${activeButton === `ch-${app.id}` ? 'remote-button-pressed' : ''}`}
+                        }`}
                       >
                         {/* Official Crisp Brand Icon */}
                         <div

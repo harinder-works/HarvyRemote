@@ -5,7 +5,10 @@ import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Rational;
+import android.view.View;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
@@ -15,8 +18,28 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
+            // Hardware acceleration flag on window
+            getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+            );
+
             WebView webView = getBridge().getWebView();
             if (webView != null) {
+                // Hardware compositing layer for 60/120fps UI
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                webView.setVerticalScrollBarEnabled(false);
+                webView.setHorizontalScrollBarEnabled(false);
+
+                WebSettings settings = webView.getSettings();
+                if (settings != null) {
+                    settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
+                    settings.setDomStorageEnabled(true);
+                    settings.setDatabaseEnabled(true);
+                    settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                }
+
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enterPip() {

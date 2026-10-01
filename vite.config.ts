@@ -42,6 +42,12 @@ export default defineConfig(() => {
         '@': path.resolve(import.meta.dirname, '.'),
       },
     },
+    build: {
+      target: 'es2020',
+      minify: 'esbuild',
+      cssMinify: true,
+      sourcemap: false,
+    },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

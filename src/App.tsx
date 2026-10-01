@@ -115,13 +115,14 @@ export default function App() {
     localStorage.setItem('gtv_remote_mode', remoteMode);
   }, [remoteMode]);
 
-  // Subscribe to command transmissions
+  // Subscribe to command transmissions only when Device Manager is open
   useEffect(() => {
+    if (!deviceModalOpen) return;
     const unsubscribe = universalTV.onCommand((log) => {
-      setCommandLogs((prev) => [log, ...prev].slice(0, 40));
+      setCommandLogs((prev) => [log, ...prev].slice(0, 30));
     });
     return unsubscribe;
-  }, []);
+  }, [deviceModalOpen]);
 
   // Listen for remote app launch events
   useEffect(() => {
@@ -360,42 +361,49 @@ export default function App() {
       {/* 
         MINI REMOTE MODE:
         Nothing on screen except the draggable white mini remote floating in the corner!
-        The rest of the screen is 100% transparent and allows clicks/touches behind it.
       */}
-      <div className="pointer-events-auto">
-        <MiniRemote
-          isOpen={remoteMode === 'mini'}
-          theme={theme}
-          onExpand={() => setRemoteMode('full')}
-          onDpadPress={handleDpadPress}
-          onSelectPress={handleSelectPress}
-          onBackPress={handleBackPress}
-          onHomePress={handleHomePress}
-          onVoicePress={handleVoicePress}
-          onMutePress={handleMutePress}
-          onPowerPress={handlePowerPress}
-          onVolumeChange={handleVolumeChange}
-          isListening={isVoiceActive}
-          isTVOn={true}
-        />
-      </div>
+      {remoteMode === 'mini' && (
+        <div className="pointer-events-auto">
+          <MiniRemote
+            isOpen={true}
+            theme={theme}
+            onExpand={() => setRemoteMode('full')}
+            onDpadPress={handleDpadPress}
+            onSelectPress={handleSelectPress}
+            onBackPress={handleBackPress}
+            onHomePress={handleHomePress}
+            onVoicePress={handleVoicePress}
+            onMutePress={handleMutePress}
+            onPowerPress={handlePowerPress}
+            onVolumeChange={handleVolumeChange}
+            isListening={isVoiceActive}
+            isTVOn={true}
+          />
+        </div>
+      )}
 
-      {/* MODALS: Open seamlessly over the remote when triggered from INSIDE the remote */}
-      <div className="pointer-events-auto">
-        <DeviceManagerModal
-          isOpen={deviceModalOpen}
-          onClose={() => setDeviceModalOpen(false)}
-          activeDevice={connectedDevice}
-          onDeviceChange={setConnectedDevice}
-          commandLogs={commandLogs}
-        />
+      {/* MODALS: Mount on-demand only when opened to keep DOM and memory minimal */}
+      {deviceModalOpen && (
+        <div className="pointer-events-auto">
+          <DeviceManagerModal
+            isOpen={true}
+            onClose={() => setDeviceModalOpen(false)}
+            activeDevice={connectedDevice}
+            onDeviceChange={setConnectedDevice}
+            commandLogs={commandLogs}
+          />
+        </div>
+      )}
 
-        <TVKeyboardDrawer
-          isOpen={keyboardDrawerOpen}
-          onClose={() => setKeyboardDrawerOpen(false)}
-          onSendText={handleSendText}
-        />
-      </div>
+      {keyboardDrawerOpen && (
+        <div className="pointer-events-auto">
+          <TVKeyboardDrawer
+            isOpen={true}
+            onClose={() => setKeyboardDrawerOpen(false)}
+            onSendText={handleSendText}
+          />
+        </div>
+      )}
     </div>
   );
 }
