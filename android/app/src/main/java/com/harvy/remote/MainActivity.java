@@ -1,6 +1,7 @@
 package com.harvy.remote;
 
 import android.app.PictureInPictureParams;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -50,6 +51,19 @@ public class MainActivity extends BridgeActivity {
                     @JavascriptInterface
                     public void enterPip() {
                         runOnUiThread(() -> triggerPipMode());
+                    }
+
+                    @JavascriptInterface
+                    public void exitPip() {
+                        runOnUiThread(() -> {
+                            try {
+                                Intent intent = new Intent(MainActivity.this, MainActivity.class);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                                startActivity(intent);
+                            } catch (Exception e) {
+                                // fallback
+                            }
+                        });
                     }
 
                     @JavascriptInterface

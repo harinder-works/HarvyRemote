@@ -56,6 +56,18 @@ export default function App() {
     }
   };
 
+  const handleExitFloating = () => {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.exitPip) {
+      try {
+        (window as any).AndroidNativeBridge.exitPip();
+      } catch {
+        // ignore
+      }
+    }
+    setRemoteMode('full');
+    setIsPip(false);
+  };
+
   // Active connected Smart TV
   const [connectedDevice, setConnectedDevice] = useState<SmartTVDevice | null>(() => {
     return (
@@ -372,7 +384,7 @@ export default function App() {
           <MiniRemote
             isOpen={true}
             theme={theme}
-            onExpand={() => setRemoteMode('full')}
+            onExpand={handleExitFloating}
             onDpadPress={handleDpadPress}
             onSelectPress={handleSelectPress}
             onBackPress={handleBackPress}
