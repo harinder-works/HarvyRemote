@@ -285,535 +285,401 @@ export function GoogleTVRemote({
   );
 
   return (
-    <div className="w-full h-full min-h-full flex items-center justify-center p-2 select-none overflow-y-auto bg-transparent">
-      {/* Remote Outer Casing Container with Side Volume Rocker */}
-      <div className="relative flex items-center justify-center py-2 px-5 shrink-0">
-        
-        {/* PHYSICAL HARDWARE: Right Edge Volume Rocker */}
-        <div className="absolute right-1 top-48 z-20 flex flex-col items-center">
-          <div className="w-4 h-32 rounded-r-xl bg-gradient-to-r from-black/20 via-black/10 to-transparent flex flex-col justify-between py-1 shadow-md">
-            {/* Volume Up */}
-            <button
-              type="button"
-              title="Volume Up (+)"
-              onClick={() => handleVolume(5)}
-              className={`w-4 h-14 rounded-r-lg ${styles.sideRocker} border-y border-r flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:brightness-90 active:translate-x-[-1px]`}
-            >
-              <span className="text-[12px] font-bold leading-none select-none pl-0.5 text-slate-700">+</span>
-            </button>
-
-            {/* Separator */}
-            <div className="w-2.5 h-px bg-black/20 self-center" />
-
-            {/* Volume Down */}
-            <button
-              type="button"
-              title="Volume Down (-)"
-              onClick={() => handleVolume(-5)}
-              className={`w-4 h-14 rounded-r-lg ${styles.sideRocker} border-y border-r flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:brightness-90 active:translate-x-[-1px]`}
-            >
-              <span className="text-[14px] font-bold leading-none select-none pl-0.5 text-slate-700">−</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Remote Pebble Body (ALL CONTROLS FULLY EMBEDDED INSIDE - Roundness matching MiniRemote rounded-[44px]) */}
-        <div
-          className={`w-[196px] rounded-[44px] ${styles.body} border-2 remote-shadow transition-colors duration-300 relative flex flex-col items-center pt-2.5 pb-6 px-4`}
-          style={{ minHeight: '488px' }}
+    <div className="w-full h-full min-h-screen flex flex-col justify-between max-w-md mx-auto py-5 px-4 select-none bg-[#0B0F19] text-slate-100">
+      {/* 1. TOP HEADER APP BAR: TV Pill & Controls */}
+      <div className="w-full flex items-center justify-between pb-3 border-b border-white/10">
+        {/* TV Device Connection Pill Button */}
+        <button
+          type="button"
+          onClick={onOpenDeviceManager}
+          title={connectedDevice ? `Connected to ${connectedDevice.name} (${connectedDevice.ip})` : 'Select / Pair Smart TV'}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
         >
-          {/* Top Drag Grip Bar */}
-          <div className="w-full flex items-center justify-between pb-1 mb-1.5 border-b border-black/10 cursor-grab active:cursor-grabbing">
-            <div className="flex items-center gap-1.5 pl-1 py-0.5">
-              <GripHorizontal className="w-4 h-4 text-slate-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Google TV</span>
-            </div>
+          <span
+            className={`w-2 h-2 shrink-0 rounded-full ${
+              connectedDevice ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+            }`}
+          />
+          <span className="truncate max-w-[130px]">
+            {connectedDevice ? connectedDevice.name : 'Connect TV'}
+          </span>
+        </button>
+
+        {/* Action Controls: Control Mode, Keyboard, and Float/Mini Remote */}
+        <div className="flex items-center gap-2">
+          {/* Mode Switch (D-Pad vs Swipe Trackpad) */}
+          <button
+            type="button"
+            onClick={() => {
+              sound.playClick('button');
+              setControlMode((m) => (m === 'dpad' ? 'trackpad' : 'dpad'));
+            }}
+            title={controlMode === 'dpad' ? 'Switch to Swipe Trackpad' : 'Switch to D-Pad'}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+          >
+            {controlMode === 'dpad' ? <MousePointer className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+
+          {/* Keyboard trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              sound.playClick('button');
+              onOpenKeyboard();
+            }}
+            title="Keyboard Typing for TV"
+            className="p-2 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
+
+          {/* Minimize to Mini Remote */}
+          <button
+            type="button"
+            onClick={() => {
+              sound.playClick('action');
+              onSwitchToMini();
+            }}
+            title="Minimize to Mini Remote"
+            className="p-2 rounded-full bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 transition-colors cursor-pointer"
+          >
+            <Minimize2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* ON-REMOTE TOAST / STATUS FEEDBACK */}
+      {onRemoteStatus && (
+        <div className="w-full my-2 px-3 py-1.5 rounded-full bg-sky-500 text-white text-xs font-bold text-center shadow-lg animate-in fade-in zoom-in duration-150 truncate">
+          {onRemoteStatus}
+        </div>
+      )}
+
+      {/* FACE 1: STANDARD FULL REMOTE CONTROLS */}
+      {remoteFace === 'controls' && (
+        <>
+          {/* 2. TOP HARDWARE ROW: Power, TV Input, Mute */}
+          <div className="flex items-center gap-3 px-1 py-2">
             <button
-              onClick={() => {
-                sound.playClick('action');
-                onSwitchToMini();
-              }}
-              title="Float Over Other Apps"
-              className="p-1 rounded-full text-slate-500 hover:text-slate-800 hover:bg-black/10 transition-colors cursor-pointer"
+              type="button"
+              onClick={handlePower}
+              title="TV Power"
+              className="flex-1 h-12 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-emerald-400 hover:text-emerald-300 transition-all active:scale-95 cursor-pointer"
             >
-              <Minimize2 className="w-3.5 h-3.5" />
+              <Power className="w-5 h-5 stroke-[2.2]" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleInput}
+              title="TV Input Source"
+              className="flex-1 h-12 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-slate-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+            >
+              <Tv className="w-5 h-5 stroke-[2.2]" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleMute}
+              title="Mute Audio"
+              className="flex-1 h-12 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-slate-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+            >
+              <VolumeX className="w-5 h-5 stroke-[2.2]" />
             </button>
           </div>
-          {/* TOP BEZEL INSIDE REMOTE: TV Status, IR LED, and Mode/Mini Switch */}
-          <div className="w-full flex items-center justify-between px-1 mb-2.5">
-            {/* TV Device Connection Pill (Inside remote) */}
-            <button
-              onClick={onOpenDeviceManager}
-              title={connectedDevice ? `Connected to ${connectedDevice.name} (${connectedDevice.ip})` : 'Select / Pair Smart TV'}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/5 hover:bg-black/10 text-[10px] font-bold text-slate-600 transition-colors"
-            >
-              <span
-                className={`w-1.5 h-1.5 shrink-0 rounded-full ${
-                  connectedDevice ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                }`}
-              />
-              <span className="truncate max-w-[82px]">
-                {connectedDevice ? connectedDevice.name : 'Connect TV'}
-              </span>
-            </button>
 
-            {/* Center IR Transceiver & Activity LED */}
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-1.5 rounded-full bg-slate-900/40 border border-black/10" />
-              <div
-                ref={ledRef}
-                className={`w-2 h-2 rounded-full transition-all duration-150 ${
-                  isListening
-                    ? 'bg-amber-400 shadow-[0_0_10px_#fbbf24] animate-pulse scale-125'
-                    : 'bg-black/15'
-                }`}
-              />
-            </div>
+          {/* 3. PRIMARY INTERACTION AREA: LARGE D-PAD OR SWIPE TRACKPAD */}
+          <div className="flex-1 flex flex-col items-center justify-center my-4">
+            {controlMode === 'dpad' ? (
+              /* Large Ergonomic D-Pad Ring */
+              <div className="relative w-[min(78vw,268px)] h-[min(78vw,268px)] flex items-center justify-center">
+                {/* Directional Pad Outer Circle */}
+                <div className="absolute inset-0 rounded-full bg-[#1A2234] border border-white/10 shadow-2xl">
+                  {/* Up */}
+                  <button
+                    type="button"
+                    onClick={() => handleDpad('up')}
+                    className="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-center pt-2 cursor-pointer text-slate-400 hover:text-white active:scale-95 transition-all"
+                    title="Navigate Up"
+                  >
+                    <ChevronUp className="w-8 h-8 stroke-[2.5]" />
+                  </button>
+                  {/* Down */}
+                  <button
+                    type="button"
+                    onClick={() => handleDpad('down')}
+                    className="absolute bottom-0 left-0 right-0 h-[72px] flex items-center justify-center pb-2 cursor-pointer text-slate-400 hover:text-white active:scale-95 transition-all"
+                    title="Navigate Down"
+                  >
+                    <ChevronDown className="w-8 h-8 stroke-[2.5]" />
+                  </button>
+                  {/* Left */}
+                  <button
+                    type="button"
+                    onClick={() => handleDpad('left')}
+                    className="absolute left-0 top-0 bottom-0 w-[72px] flex items-center justify-center pl-2 cursor-pointer text-slate-400 hover:text-white active:scale-95 transition-all"
+                    title="Navigate Left"
+                  >
+                    <ChevronLeft className="w-8 h-8 stroke-[2.5]" />
+                  </button>
+                  {/* Right */}
+                  <button
+                    type="button"
+                    onClick={() => handleDpad('right')}
+                    className="absolute right-0 top-0 bottom-0 w-[72px] flex items-center justify-center pr-2 cursor-pointer text-slate-400 hover:text-white active:scale-95 transition-all"
+                    title="Navigate Right"
+                  >
+                    <ChevronRight className="w-8 h-8 stroke-[2.5]" />
+                  </button>
+                </div>
 
-            {/* Face Switch (Grid Channels / D-Pad) */}
-            {remoteFace === 'channels' ? (
-              <button
-                onClick={() => {
-                  sound.playClick('button');
-                  setRemoteFace('controls');
-                }}
-                title="Return to D-Pad Controls"
-                className="w-6 h-6 rounded-full bg-black/5 hover:bg-black/10 text-slate-600 flex items-center justify-center transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-              </button>
+                {/* Large Center OK Button */}
+                <button
+                  type="button"
+                  onClick={handleSelect}
+                  title="Select / OK"
+                  className="relative z-10 w-[92px] h-[92px] rounded-full bg-[#242F46] hover:bg-[#2B3752] border border-white/15 shadow-xl active:scale-95 transition-all flex items-center justify-center cursor-pointer text-slate-100 font-bold text-sm tracking-wider"
+                >
+                  OK
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={() => {
-                  sound.playClick('action');
-                  setRemoteFace('channels');
-                }}
-                title="Browse Channels / Apps"
-                className="p-1 rounded-full text-slate-500 hover:text-slate-900 hover:bg-black/10 transition-colors"
+              /* Large Silky Swipe Touchpad */
+              <div
+                onPointerDown={handleTrackpadPointerDown}
+                onPointerUp={handleTrackpadPointerUp}
+                className="w-[min(82vw,284px)] h-[min(78vw,268px)] rounded-3xl bg-[#1A2234] border border-white/10 shadow-2xl flex flex-col items-center justify-center text-center p-4 cursor-pointer touch-none active:bg-[#20293D] transition-colors"
               >
-                <Grid className="w-3.5 h-3.5" />
-              </button>
+                <MousePointer className="w-8 h-8 text-sky-400 mb-2 opacity-80" />
+                <span className="text-xs font-semibold text-slate-300">Swipe to Navigate</span>
+                <span className="text-[11px] text-slate-500 mt-1">Tap to Select</span>
+              </div>
             )}
           </div>
 
-          {/* ON-REMOTE TOAST / STATUS FEEDBACK (Embedded cleanly inside the remote) */}
-          {onRemoteStatus && (
-            <div className="w-full mb-2 px-2 py-1 rounded-full bg-sky-500 text-white text-[9px] font-bold text-center shadow-md animate-in fade-in zoom-in duration-150 truncate">
-              {onRemoteStatus}
-            </div>
-          )}
+          {/* 4. CORE NAVIGATION ACTION ROW: Back, Voice Assistant, Home */}
+          <div className="grid grid-cols-3 gap-3 px-1 mb-3">
+            <button
+              type="button"
+              onClick={handleBack}
+              title="Back"
+              className="h-14 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-slate-200 hover:text-white transition-all active:scale-95 cursor-pointer"
+            >
+              <ArrowLeft className="w-6 h-6 stroke-[2.2]" />
+            </button>
 
-          {/* ========================================================= */}
-          {/* FACE 1: STANDARD REMOTE CONTROLS (D-Pad, Voice, Home...) */}
-          {/* ========================================================= */}
-          {remoteFace === 'controls' && (
-            <>
-              {/* D-PAD / TRACKPAD AREA */}
-              {controlMode === 'dpad' ? (
-                /* Directional Ring */
-                <div className="relative w-[138px] h-[138px] mb-3 flex items-center justify-center">
-                  <div className={`absolute inset-0 rounded-full ${styles.dpadRing} border-2 dpad-groove`}>
-                    {/* Up */}
-                    <button
-                      type="button"
-                      onClick={() => handleDpad('up')}
-                      className="absolute top-0 left-0 right-0 h-11 flex items-center justify-center pt-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
-                      title="Navigate Up"
-                    >
-                      <ChevronUp className="w-5 h-5 stroke-[2.5]" />
-                    </button>
+            <button
+              type="button"
+              onClick={handleVoice}
+              title="Google Assistant Voice Search"
+              className={`h-14 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                isListening ? 'ring-2 ring-sky-400 bg-sky-500/20' : ''
+              }`}
+            >
+              <GoogleDots className="w-6 h-6" active={isListening} />
+            </button>
 
-                    {/* Down */}
-                    <button
-                      type="button"
-                      onClick={() => handleDpad('down')}
-                      className="absolute bottom-0 left-0 right-0 h-11 flex items-center justify-center pb-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
-                      title="Navigate Down"
-                    >
-                      <ChevronDown className="w-5 h-5 stroke-[2.5]" />
-                    </button>
-
-                    {/* Left */}
-                    <button
-                      type="button"
-                      onClick={() => handleDpad('left')}
-                      className="absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center pl-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
-                      title="Navigate Left"
-                    >
-                      <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                    </button>
-
-                    {/* Right */}
-                    <button
-                      type="button"
-                      onClick={() => handleDpad('right')}
-                      className="absolute right-0 top-0 bottom-0 w-11 flex items-center justify-center pr-1.5 cursor-pointer text-slate-600 transition-all hover:opacity-80 active:scale-90 active:opacity-60"
-                      title="Navigate Right"
-                    >
-                      <ChevronRight className="w-5 h-5 stroke-[2.5]" />
-                    </button>
-                  </div>
-
-                  {/* Center Select (OK) */}
-                  <button
-                    type="button"
-                    onClick={handleSelect}
-                    title="Select / OK"
-                    className={`relative z-10 w-[58px] h-[58px] rounded-full ${styles.dpadCenter} border-2 remote-button-shadow cursor-pointer transition-all flex items-center justify-center hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                  >
-                    <span className="w-3.5 h-3.5 rounded-full bg-black/10 border border-white/20" />
-                  </button>
-                </div>
-              ) : (
-                /* Swipe Trackpad Area */
-                <div
-                  onPointerDown={handleTrackpadPointerDown}
-                  onPointerUp={handleTrackpadPointerUp}
-                  className={`w-[138px] h-[138px] rounded-3xl ${styles.dpadRing} border-2 dpad-groove mb-3 flex flex-col items-center justify-center text-center p-3 cursor-pointer touch-none active:brightness-95 transition-all`}
-                >
-                  <MousePointer className="w-5 h-5 text-sky-500 mb-1 opacity-80" />
-                  <span className="text-[10px] font-semibold text-slate-600">
-                    Swipe to Navigate
-                  </span>
-                  <span className="text-[9px] text-slate-400">Tap to Select</span>
-                </div>
-              )}
-
-              {/* BUTTON GRID: Row 1 - Back & Voice Search */}
-              <div className="grid grid-cols-2 gap-2.5 w-full px-1 mb-2.5">
-                {/* Back Button */}
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  title="Back"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
-                </button>
-
-                {/* Google Assistant Voice Search Button */}
-                <button
-                  type="button"
-                  onClick={handleVoice}
-                  title="Voice Search"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer relative overflow-hidden ${
-                    isListening ? 'ring-2 ring-sky-400 bg-sky-100/60' : ''
-                  } hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <GoogleDots className="w-5 h-5" active={isListening} />
-                </button>
-              </div>
-
-              {/* BUTTON GRID: Row 2 - Home & Mute */}
-              <div className="grid grid-cols-2 gap-2.5 w-full px-1 mb-2.5">
-                {/* Home Button */}
-                <button
-                  type="button"
-                  onClick={handleHome}
-                  title="Home"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <Home className="w-4 h-4 stroke-[2.2]" />
-                </button>
-
-                {/* Mute Button */}
-                <button
-                  type="button"
-                  onClick={handleMute}
-                  title="Mute Audio"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <VolumeX className="w-4 h-4 stroke-[2.2]" />
-                </button>
-              </div>
-
-              {/* BUTTON GRID: Row 3 - Customizable App Shortcut Buttons (Key 1 & Key 2) */}
-              <div className="grid grid-cols-2 gap-2.5 w-full px-1 mb-2.5">
-                {/* Shortcut 1 */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick('action');
-                    triggerLed('app-1');
-                    onLaunchApp(shortcut1);
-                    showStatus(`Playing ${shortcut1.shortLabel}`);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    sound.playClick('button');
-                    setPromotingApp(shortcut1);
-                    setRemoteFace('channels');
-                  }}
-                  title={`${shortcut1.name} (Hold or right-click to change)`}
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 px-2.5 transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <div style={{ color: shortcut1.brandColor }} className="shrink-0 flex items-center justify-center">
-                    <AppIconRenderer iconType={shortcut1.iconType} className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] font-bold tracking-tight truncate max-w-[48px] text-slate-700">
-                    {shortcut1.shortLabel}
-                  </span>
-                </button>
-
-                {/* Shortcut 2 */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick('action');
-                    triggerLed();
-                    onLaunchApp(shortcut2);
-                    showStatus(`Playing ${shortcut2.shortLabel}`);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    sound.playClick('button');
-                    setPromotingApp(shortcut2);
-                    setRemoteFace('channels');
-                  }}
-                  title={`${shortcut2.name} (Hold or right-click to change)`}
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 px-2.5 transition-all cursor-pointer hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <div style={{ color: shortcut2.brandColor }} className="shrink-0 flex items-center justify-center">
-                    <AppIconRenderer iconType={shortcut2.iconType} className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] font-bold tracking-tight truncate max-w-[48px] text-slate-700">
-                    {shortcut2.shortLabel}
-                  </span>
-                </button>
-              </div>
-
-              {/* BUTTON GRID: Row 4 - Power & TV Input */}
-              <div className="grid grid-cols-2 gap-2.5 w-full px-1 mb-2.5">
-                {/* Power Button */}
-                <button
-                  type="button"
-                  onClick={handlePower}
-                  title="TV Power"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-emerald-600 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <Power className="w-4 h-4 stroke-[2.2]" />
-                </button>
-
-                {/* Input Button */}
-                <button
-                  type="button"
-                  onClick={handleInput}
-                  title="TV Input Source"
-                  className={`h-11 rounded-full ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-700 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <Tv className="w-4 h-4 stroke-[2.2]" />
-                </button>
-              </div>
-
-              {/* BUTTON GRID: Row 5 - CLEAN ICON-ONLY HARDWARE ROW (Keyboard & Channels Grid) */}
-              <div className="grid grid-cols-2 gap-2.5 w-full px-1 mb-2">
-                {/* On-Screen Keyboard Trigger (Icon Only) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick('button');
-                    triggerLed();
-                    onOpenKeyboard();
-                  }}
-                  title="Keyboard Typing for TV"
-                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <Keyboard className="w-4 h-4" />
-                </button>
-
-                {/* All Channels Grid Face Trigger (Icon Only) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick('button');
-                    triggerLed();
-                    setRemoteFace('channels');
-                  }}
-                  title="All Channels & Apps (Hotstar, Netflix, YouTube, Prime, Disney+...)"
-                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:brightness-95 active:scale-95 active:remote-button-pressed`}
-                >
-                  <Grid className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* FACE 2: CHANNELS LIST (EXACT SAME REMOTE CASING & BUTTON KEYS) */}
-          {/* ============================================================== */}
-          {remoteFace === 'channels' && (
-            <div className="w-full flex-1 flex flex-col items-center">
-              {/* Header Label inside Remote */}
-              <div className="w-full flex items-center justify-center px-1 mb-2.5">
-                <span className="text-[10px] font-bold tracking-widest uppercase text-slate-500 flex items-center gap-1.5">
-                  <Grid className="w-3.5 h-3.5 text-slate-400" />
-                  Channels
-                </span>
-              </div>
-
-              {/* Channels Grid: EXACT tactile icon buttons matching remote keys */}
-              <div
-                className="w-full flex-1 overflow-y-auto px-1 py-1 space-y-2 max-h-[300px] scrollbar-thin"
-                style={{ scrollbarWidth: 'none' }}
-              >
-                <div className="grid grid-cols-2 gap-2 w-full">
-                  {filteredChannels.map((app) => {
-                    const isKey1 = shortcut1.id === app.id;
-                    const isKey2 = shortcut2.id === app.id;
-                    const isHomeKey = isKey1 || isKey2;
-
-                    return (
-                      <button
-                        key={app.id}
-                        type="button"
-                        onClick={() => handleChannelTap(app)}
-                        onPointerDown={() => handleChannelLongPressStart(app)}
-                        onPointerUp={handleChannelLongPressEnd}
-                        onPointerLeave={handleChannelLongPressEnd}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          sound.playClick('button');
-                          setPromotingApp(app);
-                        }}
-                        title={`${app.name} (${isHomeKey ? 'Promoted to Home Screen • ' : ''}Tap to play, Hold to set Home key)`}
-                        className={`h-12 rounded-full border remote-button-shadow flex items-center justify-center relative transition-all cursor-pointer select-none active:scale-90 active:remote-button-pressed ${
-                          isHomeKey
-                            ? 'bg-[#EBF3FE] border-sky-400 ring-2 ring-sky-400/40 shadow-sm'
-                            : `${styles.button} border-[#D3D8E0]`
-                        }`}
-                      >
-                        {/* Official Crisp Brand Icon */}
-                        <div
-                          style={{ color: app.brandColor }}
-                          className="shrink-0 flex items-center justify-center scale-110"
-                        >
-                          <AppIconRenderer iconType={app.iconType} className="w-5 h-5" />
-                        </div>
-
-                        {/* Distinct Promoted Home Screen Indicator Badge */}
-                        {isKey1 && (
-                          <span
-                            title="Assigned to Left Home Key"
-                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sky-500 text-white text-[8px] font-black flex items-center justify-center shadow-sm ring-1 ring-white"
-                          >
-                            1
-                          </span>
-                        )}
-                        {isKey2 && (
-                          <span
-                            title="Assigned to Right Home Key"
-                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sky-500 text-white text-[8px] font-black flex items-center justify-center shadow-sm ring-1 ring-white"
-                          >
-                            2
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Bottom Navigation Row on Channels Face */}
-              <div className="grid grid-cols-2 gap-2.5 w-full px-1 mt-3 mb-1">
-                {/* Back to D-Pad Remote Controls */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick('button');
-                    setRemoteFace('controls');
-                  }}
-                  title="Back to D-Pad Controls"
-                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center gap-1.5 transition-all cursor-pointer text-slate-700 font-bold text-[10px]`}
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>D-Pad</span>
-                </button>
-
-                {/* Keyboard typing button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick('button');
-                    onOpenKeyboard();
-                  }}
-                  title="Open TV Keyboard"
-                  className={`h-10 rounded-2xl ${styles.button} border remote-button-shadow flex items-center justify-center transition-all cursor-pointer text-slate-600 hover:text-slate-900`}
-                >
-                  <Keyboard className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* INLINE PROMOTION DRAWER / MODAL INSIDE THE REMOTE */}
-              {promotingApp && (
-                <div className="absolute inset-x-3 bottom-12 z-30 rounded-[32px] bg-[#E1E5EA] border-2 border-slate-300 shadow-2xl p-3 flex flex-col items-center text-center animate-in slide-in-from-bottom-2 duration-150">
-                  <div
-                    className="w-8 h-8 rounded-full bg-white remote-button-shadow flex items-center justify-center mb-1.5"
-                    style={{ color: promotingApp.brandColor }}
-                  >
-                    <AppIconRenderer iconType={promotingApp.iconType} className="w-4 h-4" />
-                  </div>
-
-                  <span className="text-[10px] font-bold text-slate-800 mb-0.5 truncate max-w-[140px]">
-                    {promotingApp.name}
-                  </span>
-                  <span className="text-[9px] text-slate-500 mb-2">
-                    Set as Home Screen Button:
-                  </span>
-
-                  <div className="grid grid-cols-2 gap-1.5 w-full mb-2">
-                    <button
-                      type="button"
-                      onClick={() => handlePromoteToSlot(1)}
-                      className={`h-8 rounded-full border text-[9px] font-bold remote-button-shadow transition-all ${
-                        shortcut1.id === promotingApp.id
-                          ? 'bg-sky-500 text-white border-sky-600'
-                          : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 active:scale-95'
-                      }`}
-                    >
-                      Key 1 ({shortcut1.shortLabel})
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handlePromoteToSlot(2)}
-                      className={`h-8 rounded-full border text-[9px] font-bold remote-button-shadow transition-all ${
-                        shortcut2.id === promotingApp.id
-                          ? 'bg-sky-500 text-white border-sky-600'
-                          : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 active:scale-95'
-                      }`}
-                    >
-                      Key 2 ({shortcut2.shortLabel})
-                    </button>
-                  </div>
-
-                  {(shortcut1.id === promotingApp.id || shortcut2.id === promotingApp.id) && (
-                    <button
-                      type="button"
-                      onClick={() => handleDemoteSlot(shortcut1.id === promotingApp.id ? 1 : 2)}
-                      className="text-[9px] font-semibold text-rose-600 hover:text-rose-700 mb-1"
-                    >
-                      Demote from Home Screen
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => setPromotingApp(null)}
-                    className="text-[9px] font-semibold text-slate-500 hover:text-slate-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Bottom Custom Emblem Logo */}
-          <div className="mt-auto pt-1 flex items-center justify-center">
-            <WebsiteEmblem className={`w-7 h-4.5 ${styles.logo}`} />
+            <button
+              type="button"
+              onClick={handleHome}
+              title="Home"
+              className="h-14 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-slate-200 hover:text-white transition-all active:scale-95 cursor-pointer"
+            >
+              <Home className="w-6 h-6 stroke-[2.2]" />
+            </button>
           </div>
+
+          {/* 5. VOLUME & SHORTCUTS ROW */}
+          <div className="grid grid-cols-4 gap-2 px-1 mb-2">
+            {/* Volume Down */}
+            <button
+              type="button"
+              onClick={() => handleVolume(-5)}
+              title="Volume Down (-)"
+              className="h-13 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-slate-200 text-lg font-bold active:scale-95 cursor-pointer"
+            >
+              −
+            </button>
+
+            {/* Volume Up */}
+            <button
+              type="button"
+              onClick={() => handleVolume(5)}
+              title="Volume Up (+)"
+              className="h-13 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center text-slate-200 text-lg font-bold active:scale-95 cursor-pointer"
+            >
+              +
+            </button>
+
+            {/* Fast Shortcut 1 */}
+            <button
+              type="button"
+              onClick={() => {
+                sound.playClick('action');
+                onLaunchApp(shortcut1);
+                showStatus(`Playing ${shortcut1.shortLabel}`);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                sound.playClick('button');
+                setPromotingApp(shortcut1);
+                setRemoteFace('channels');
+              }}
+              title={`${shortcut1.name} (Hold to change)`}
+              className="h-13 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center gap-1.5 px-1.5 active:scale-95 cursor-pointer"
+            >
+              <div style={{ color: shortcut1.brandColor }} className="shrink-0 flex items-center justify-center">
+                <AppIconRenderer iconType={shortcut1.iconType} className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] font-bold truncate text-slate-200">{shortcut1.shortLabel}</span>
+            </button>
+
+            {/* Fast Shortcut 2 */}
+            <button
+              type="button"
+              onClick={() => {
+                sound.playClick('action');
+                onLaunchApp(shortcut2);
+                showStatus(`Playing ${shortcut2.shortLabel}`);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                sound.playClick('button');
+                setPromotingApp(shortcut2);
+                setRemoteFace('channels');
+              }}
+              title={`${shortcut2.name} (Hold to change)`}
+              className="h-13 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/5 flex items-center justify-center gap-1.5 px-1.5 active:scale-95 cursor-pointer"
+            >
+              <div style={{ color: shortcut2.brandColor }} className="shrink-0 flex items-center justify-center">
+                <AppIconRenderer iconType={shortcut2.iconType} className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] font-bold truncate text-slate-200">{shortcut2.shortLabel}</span>
+            </button>
+          </div>
+
+          {/* 6. CHANNELS TRAY TRIGGER */}
+          <div className="w-full px-1 pt-1 pb-1">
+            <button
+              type="button"
+              onClick={() => setRemoteFace('channels')}
+              className="w-full h-11 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center gap-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <Grid className="w-4 h-4 text-slate-400" />
+              <span>All Channels & Streaming Apps</span>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* FACE 2: CHANNELS & STREAMING APPS VIEW */}
+      {remoteFace === 'channels' && (
+        <div className="flex-1 flex flex-col justify-between py-2">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between px-1 mb-3">
+            <button
+              type="button"
+              onClick={() => setRemoteFace('controls')}
+              className="flex items-center gap-2 text-xs font-bold text-sky-400 hover:text-sky-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Controls</span>
+            </button>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">All Channels</span>
+          </div>
+
+          {/* Channel Search Bar */}
+          <div className="relative mb-3 px-1">
+            <Search className="absolute left-4 top-3 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={channelSearchQuery}
+              onChange={(e) => setChannelSearchQuery(e.target.value)}
+              placeholder="Search channels..."
+              className="w-full h-10 pl-10 pr-4 rounded-xl bg-white/10 border border-white/10 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+            />
+          </div>
+
+          {/* Channels Grid */}
+          <div className="flex-1 overflow-y-auto px-1 max-h-[420px] scrollbar-thin space-y-2">
+            <div className="grid grid-cols-2 gap-2.5">
+              {filteredChannels.map((app) => {
+                const isKey1 = shortcut1.id === app.id;
+                const isKey2 = shortcut2.id === app.id;
+                const isHomeKey = isKey1 || isKey2;
+
+                return (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => handleChannelTap(app)}
+                    onPointerDown={() => handleChannelLongPressStart(app)}
+                    onPointerUp={handleChannelLongPressEnd}
+                    onPointerLeave={handleChannelLongPressEnd}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      sound.playClick('button');
+                      setPromotingApp(app);
+                    }}
+                    title={`${app.name} (${isHomeKey ? 'Assigned • ' : ''}Tap to launch, Hold to set shortcut)`}
+                    className={`h-14 rounded-2xl border flex items-center gap-3 px-3 relative transition-all cursor-pointer select-none active:scale-95 ${
+                      isHomeKey
+                        ? 'bg-sky-500/20 border-sky-400/60 ring-1 ring-sky-400/40 text-white'
+                        : 'bg-white/10 hover:bg-white/15 border-white/10 text-slate-200'
+                    }`}
+                  >
+                    <div style={{ color: app.brandColor }} className="shrink-0 flex items-center justify-center">
+                      <AppIconRenderer iconType={app.iconType} className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold truncate text-left">{app.name}</span>
+
+                    {isKey1 && (
+                      <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-sky-500 text-white text-[9px] font-black flex items-center justify-center shadow-sm">
+                        1
+                      </span>
+                    )}
+                    {isKey2 && (
+                      <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-sky-500 text-white text-[9px] font-black flex items-center justify-center shadow-sm">
+                        2
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Promotion Drawer */}
+          {promotingApp && (
+            <div className="mt-2 p-3 rounded-2xl bg-[#1A2234] border border-white/15 shadow-xl flex flex-col items-center text-center">
+              <span className="text-xs font-bold text-white mb-1">Assign {promotingApp.name} to:</span>
+              <div className="grid grid-cols-2 gap-2 w-full my-2">
+                <button
+                  type="button"
+                  onClick={() => handlePromoteToSlot(1)}
+                  className="h-9 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200"
+                >
+                  Shortcut 1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromoteToSlot(2)}
+                  className="h-9 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200"
+                >
+                  Shortcut 2
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPromotingApp(null)}
+                className="text-[11px] text-slate-400 hover:text-white mt-1"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

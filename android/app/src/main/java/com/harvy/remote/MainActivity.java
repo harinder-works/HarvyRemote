@@ -26,12 +26,11 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
-            getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
-                // Ensure transparent background so system wallpaper is fully visible
-                webView.setBackgroundColor(Color.TRANSPARENT);
+                webView.setBackgroundColor(Color.parseColor("#0B0F19"));
 
                 // Hardware compositing layer for 60/120fps UI
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -100,6 +99,13 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView webView = getBridge().getWebView();
             if (webView != null) {
+                if (isInPictureInPictureMode) {
+                    webView.setBackgroundColor(Color.TRANSPARENT);
+                    getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                } else {
+                    webView.setBackgroundColor(Color.parseColor("#0B0F19"));
+                    getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
+                }
                 webView.post(() -> {
                     webView.evaluateJavascript(
                         "window.dispatchEvent(new CustomEvent('pip-mode-changed', { detail: { isPip: " + isInPictureInPictureMode + " } }));",

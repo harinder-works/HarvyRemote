@@ -50,7 +50,7 @@ export function MiniRemote({
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-1 select-none overflow-hidden bg-transparent">
       <div
-        className="w-[168px] max-w-[95vw] rounded-[34px] border-2 border-[#D9DDE2] bg-[#EDEDF0] text-slate-800 p-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto"
+        className="w-[158px] max-w-[96vw] rounded-[32px] border-2 border-[#D9DDE2] bg-[#EDEDF0] text-slate-800 p-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto"
       >
         {/* Top Controls (Power & Expand) */}
         <div className="w-full flex items-center justify-between pb-1 mb-1 border-b border-black/10 select-none">

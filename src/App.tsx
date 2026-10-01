@@ -38,6 +38,8 @@ export default function App() {
       setIsPip(pipActive);
       if (pipActive) {
         setRemoteMode('mini');
+      } else {
+        setRemoteMode('full');
       }
     };
     window.addEventListener('pip-mode-changed', handlePip);
@@ -325,7 +327,11 @@ export default function App() {
 
   return (
     <div
-      className="w-full h-full min-h-full flex items-center justify-center p-0 m-0 select-none relative bg-transparent overflow-hidden"
+      className={`w-full min-h-screen select-none ${
+        isPip
+          ? 'bg-transparent flex items-center justify-center p-0 overflow-hidden'
+          : 'bg-[#0B0F19] text-slate-100 flex flex-col justify-center items-center overflow-x-hidden'
+      }`}
     >
       {/* 
         NO WEBSITE HEADER.
@@ -348,9 +354,9 @@ export default function App() {
         </div>
       )}
 
-      {/* FULL REMOTE MODE: Only the white remote body appears */}
+      {/* FULL REMOTE MODE: Large authentic Google TV remote filling the screen */}
       {remoteMode === 'full' && (
-        <div className="pointer-events-auto">
+        <div className="w-full h-full min-h-screen flex-1 flex flex-col items-center justify-center pointer-events-auto">
           <GoogleTVRemote
             theme={theme}
             shortcut1={shortcut1}
