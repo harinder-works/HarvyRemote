@@ -19,7 +19,7 @@ import {
   GripHorizontal,
 } from 'lucide-react';
 import { AppShortcut, PRESET_APPS, RemoteTheme } from '../types/remote';
-import { AppIconRenderer, GoogleDots, WebsiteEmblem } from './BrandIcons';
+import { AppIconRenderer, GoogleDots, GoogleAssistantLines, WebsiteEmblem } from './BrandIcons';
 import { sound } from '../utils/audio';
 import { SmartTVDevice, TV_BRAND_CONFIG } from '../utils/universalTVProtocol';
 
@@ -471,12 +471,12 @@ export function GoogleTVRemote({
             <button
               type="button"
               onClick={handleVoice}
-              title="Google Assistant Voice Search"
+              title="Google Assistant Voice Search (Listen)"
               className={`h-14 rounded-2xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-sm ${
                 isListening ? 'ring-2 ring-sky-400 bg-sky-100' : ''
               }`}
             >
-              <GoogleDots className="w-6 h-6" active={isListening} />
+              <GoogleAssistantLines active={isListening} className="scale-125" />
             </button>
 
             <button

@@ -145,13 +145,47 @@ export function TubiIcon({ className = "w-5 h-5" }: { className?: string }) {
   );
 }
 
-export function GoogleDots({ className = "w-6 h-6", active = false }: { className?: string; active?: boolean }) {
+export function GoogleAssistantLines({
+  className = "",
+  active = false,
+}: {
+  className?: string;
+  active?: boolean;
+}) {
   return (
-    <div className={`flex items-center justify-center gap-1.5 ${className}`}>
-      <span className={`w-2 h-2 rounded-full bg-[#4285F4] ${active ? 'assistant-dot-1' : ''}`} />
-      <span className={`w-2 h-2 rounded-full bg-[#EA4335] ${active ? 'assistant-dot-2' : ''}`} />
-      <span className={`w-2 h-2 rounded-full bg-[#FBBC05] ${active ? 'assistant-dot-3' : ''}`} />
-      <span className={`w-2 h-2 rounded-full bg-[#34A853] ${active ? 'assistant-dot-4' : ''}`} />
+    <div className={`flex items-center justify-center gap-[3px] h-4.5 px-0.5 ${className}`}>
+      {/* 4 Iconic Google Assistant Colored Voice Lines */}
+      <span
+        className={`w-1 rounded-full bg-[#4285F4] transition-all duration-200 ${
+          active ? 'h-4 animate-bounce' : 'h-2.5'
+        }`}
+      />
+      <span
+        className={`w-1 rounded-full bg-[#EA4335] transition-all duration-200 ${
+          active ? 'h-5 animate-bounce [animation-delay:0.15s]' : 'h-4'
+        }`}
+      />
+      <span
+        className={`w-1 rounded-full bg-[#FBBC05] transition-all duration-200 ${
+          active ? 'h-4.5 animate-bounce [animation-delay:0.3s]' : 'h-3'
+        }`}
+      />
+      <span
+        className={`w-1 rounded-full bg-[#34A853] transition-all duration-200 ${
+          active ? 'h-3.5 animate-bounce [animation-delay:0.45s]' : 'h-2'
+        }`}
+      />
+    </div>
+  );
+}
+
+export function GoogleDots({ className = "", active = false }: { className?: string; active?: boolean }) {
+  return (
+    <div className={`inline-flex items-center justify-center gap-1 shrink-0 ${className}`}>
+      <span className={`w-1.5 h-1.5 rounded-full bg-[#4285F4] shrink-0 ${active ? 'assistant-dot-1' : ''}`} />
+      <span className={`w-1.5 h-1.5 rounded-full bg-[#EA4335] shrink-0 ${active ? 'assistant-dot-2' : ''}`} />
+      <span className={`w-1.5 h-1.5 rounded-full bg-[#FBBC05] shrink-0 ${active ? 'assistant-dot-3' : ''}`} />
+      <span className={`w-1.5 h-1.5 rounded-full bg-[#34A853] shrink-0 ${active ? 'assistant-dot-4' : ''}`} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import {
   ChevronRight,
   Power,
 } from 'lucide-react';
-import { GoogleDots } from './BrandIcons';
+import { GoogleDots, GoogleAssistantLines } from './BrandIcons';
 import { sound } from '../utils/audio';
 import { RemoteTheme } from '../types/remote';
 
@@ -173,12 +173,12 @@ export function MiniRemote({
           <button
             type="button"
             onClick={onVoicePress}
-            title="Voice Search"
+            title="Google Assistant Voice Search (Listen)"
             className={`h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 transition-all ${
               isListening ? 'ring-2 ring-sky-400 bg-sky-100' : ''
             }`}
           >
-            <GoogleDots className="w-3.5 h-3.5" active={isListening} />
+            <GoogleAssistantLines active={isListening} />
           </button>
 
           <button
