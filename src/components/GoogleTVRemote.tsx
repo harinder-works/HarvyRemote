@@ -476,7 +476,7 @@ export function GoogleTVRemote({
                 isListening ? 'ring-2 ring-sky-400 bg-sky-100' : ''
               }`}
             >
-              <GoogleAssistantLines active={isListening} className="scale-125" />
+              <GoogleAssistantLines size="md" active={isListening} />
             </button>
 
             <button
@@ -574,35 +574,47 @@ export function GoogleTVRemote({
 
       {/* FACE 2: CHANNELS & STREAMING APPS VIEW */}
       {remoteFace === 'channels' && (
-        <div className="flex-1 flex flex-col justify-between py-2">
+        <div className="flex-1 min-h-0 flex flex-col pt-1 pb-1 overflow-hidden">
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-1 mb-3">
+          <div className="flex items-center justify-between px-1 mb-2">
             <button
               type="button"
               onClick={() => setRemoteFace('controls')}
-              className="flex items-center gap-2 text-xs font-bold text-sky-600 hover:text-sky-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-xs font-bold text-slate-700 hover:text-black transition-all shadow-sm cursor-pointer active:scale-95"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Controls</span>
             </button>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">All Channels</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 bg-[#E1E5EA] border border-[#D0D5DC] px-2.5 py-1 rounded-full shadow-sm">
+              {filteredChannels.length} Channels
+            </span>
           </div>
 
           {/* Channel Search Bar */}
-          <div className="relative mb-3 px-1">
+          <div className="relative mb-2 px-1">
             <Search className="absolute left-4 top-3 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={channelSearchQuery}
               onChange={(e) => setChannelSearchQuery(e.target.value)}
-              placeholder="Search channels..."
-              className="w-full h-10 pl-10 pr-4 rounded-xl bg-white border border-[#D0D5DC] text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="Search channels & streaming apps..."
+              className="w-full h-10 pl-10 pr-9 rounded-xl bg-white border border-[#D0D5DC] text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 shadow-sm"
             />
+            {channelSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setChannelSearchQuery('')}
+                className="absolute right-3.5 top-2.5 p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                title="Clear search"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Channels Grid */}
-          <div className="flex-1 overflow-y-auto px-1 max-h-[420px] scrollbar-thin space-y-2">
-            <div className="grid grid-cols-2 gap-2.5">
+          {/* Channels Grid with Custom Sleek Scrollbar */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-1 pr-1.5 custom-remote-scrollbar space-y-2">
+            <div className="grid grid-cols-2 gap-2.5 pb-2">
               {filteredChannels.map((app) => {
                 const isKey1 = shortcut1.id === app.id;
                 const isKey2 = shortcut2.id === app.id;
@@ -647,24 +659,38 @@ export function GoogleTVRemote({
                 );
               })}
             </div>
+
+            {filteredChannels.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <Search className="w-8 h-8 mb-2 opacity-40 text-slate-400" />
+                <p className="text-xs font-semibold text-slate-600">No channels found</p>
+                <button
+                  type="button"
+                  onClick={() => setChannelSearchQuery('')}
+                  className="mt-2 text-xs font-bold text-sky-600 hover:underline cursor-pointer"
+                >
+                  Reset search
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Promotion Drawer */}
           {promotingApp && (
-            <div className="mt-2 p-3 rounded-2xl bg-[#DFE3E8] border border-[#CFD4DC] shadow-xl flex flex-col items-center text-center">
+            <div className="mt-2 p-3 rounded-2xl bg-[#DFE3E8] border border-[#CFD4DC] shadow-xl flex flex-col items-center text-center shrink-0">
               <span className="text-xs font-bold text-slate-800 mb-1">Assign {promotingApp.name} to:</span>
               <div className="grid grid-cols-2 gap-2 w-full my-2">
                 <button
                   type="button"
                   onClick={() => handlePromoteToSlot(1)}
-                  className="h-9 rounded-xl bg-white hover:bg-slate-50 border border-[#D0D5DC] text-xs font-semibold text-slate-800 shadow-sm"
+                  className="h-9 rounded-xl bg-white hover:bg-slate-50 border border-[#D0D5DC] text-xs font-semibold text-slate-800 shadow-sm cursor-pointer"
                 >
                   Shortcut 1
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePromoteToSlot(2)}
-                  className="h-9 rounded-xl bg-white hover:bg-slate-50 border border-[#D0D5DC] text-xs font-semibold text-slate-800 shadow-sm"
+                  className="h-9 rounded-xl bg-white hover:bg-slate-50 border border-[#D0D5DC] text-xs font-semibold text-slate-800 shadow-sm cursor-pointer"
                 >
                   Shortcut 2
                 </button>
@@ -672,7 +698,7 @@ export function GoogleTVRemote({
               <button
                 type="button"
                 onClick={() => setPromotingApp(null)}
-                className="text-[11px] text-slate-500 hover:text-slate-800 mt-1"
+                className="text-[11px] text-slate-500 hover:text-slate-800 mt-1 cursor-pointer"
               >
                 Cancel
               </button>

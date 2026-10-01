@@ -178,7 +178,7 @@ export function MiniRemote({
               isListening ? 'ring-2 ring-sky-400 bg-sky-100' : ''
             }`}
           >
-            <GoogleAssistantLines active={isListening} />
+            <GoogleAssistantLines size="sm" active={isListening} />
           </button>
 
           <button

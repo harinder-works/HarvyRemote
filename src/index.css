@@ -96,3 +96,29 @@ html, body, #root {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Custom sleek Google TV Remote scrollbar */
+.custom-remote-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-remote-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.custom-remote-scrollbar::-webkit-scrollbar-thumb {
+  background: #C4CAD1;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: background-color 0.2s ease;
+}
+
+.custom-remote-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9AA3AC;
+}
+
+.custom-remote-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #C4CAD1 transparent;
+}

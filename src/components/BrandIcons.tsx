@@ -147,32 +147,90 @@ export function TubiIcon({ className = "w-5 h-5" }: { className?: string }) {
 
 export function GoogleAssistantLines({
   className = "",
+  size = "sm",
   active = false,
 }: {
   className?: string;
+  size?: "xs" | "sm" | "md";
   active?: boolean;
 }) {
+  if (size === "xs") {
+    // Ultra compact for very small spaces
+    return (
+      <div className={`flex items-center justify-center gap-[2px] h-3 px-0.5 ${className}`}>
+        <span
+          className={`w-[2px] rounded-full bg-[#4285F4] transition-all duration-200 ${
+            active ? 'h-3 animate-bounce' : 'h-[6px]'
+          }`}
+        />
+        <span
+          className={`w-[2px] rounded-full bg-[#EA4335] transition-all duration-200 ${
+            active ? 'h-3.5 animate-bounce [animation-delay:0.15s]' : 'h-[9px]'
+          }`}
+        />
+        <span
+          className={`w-[2px] rounded-full bg-[#FBBC05] transition-all duration-200 ${
+            active ? 'h-3 animate-bounce [animation-delay:0.3s]' : 'h-[7.5px]'
+          }`}
+        />
+        <span
+          className={`w-[2px] rounded-full bg-[#34A853] transition-all duration-200 ${
+            active ? 'h-2.5 animate-bounce [animation-delay:0.45s]' : 'h-[5px]'
+          }`}
+        />
+      </div>
+    );
+  }
+
+  if (size === "sm") {
+    // Proportional, elegant size for mini remote (matches 14px icons like ArrowLeft & Home)
+    return (
+      <div className={`flex items-center justify-center gap-[2.5px] h-3.5 px-0.5 ${className}`}>
+        <span
+          className={`w-[2.2px] rounded-full bg-[#4285F4] transition-all duration-200 ${
+            active ? 'h-3.5 animate-bounce' : 'h-[7px]'
+          }`}
+        />
+        <span
+          className={`w-[2.2px] rounded-full bg-[#EA4335] transition-all duration-200 ${
+            active ? 'h-4 animate-bounce [animation-delay:0.15s]' : 'h-[11px]'
+          }`}
+        />
+        <span
+          className={`w-[2.2px] rounded-full bg-[#FBBC05] transition-all duration-200 ${
+            active ? 'h-3.5 animate-bounce [animation-delay:0.3s]' : 'h-[9px]'
+          }`}
+        />
+        <span
+          className={`w-[2.2px] rounded-full bg-[#34A853] transition-all duration-200 ${
+            active ? 'h-3 animate-bounce [animation-delay:0.45s]' : 'h-[6px]'
+          }`}
+        />
+      </div>
+    );
+  }
+
+  // "md" for full remote (matches 24px navigation icons)
   return (
     <div className={`flex items-center justify-center gap-[3px] h-4.5 px-0.5 ${className}`}>
-      {/* 4 Iconic Google Assistant Colored Voice Lines */}
       <span
-        className={`w-1 rounded-full bg-[#4285F4] transition-all duration-200 ${
-          active ? 'h-4 animate-bounce' : 'h-2.5'
+        className={`w-[3px] rounded-full bg-[#4285F4] transition-all duration-200 ${
+          active ? 'h-4 animate-bounce' : 'h-[10px]'
         }`}
       />
       <span
-        className={`w-1 rounded-full bg-[#EA4335] transition-all duration-200 ${
-          active ? 'h-5 animate-bounce [animation-delay:0.15s]' : 'h-4'
+        className={`w-[3px] rounded-full bg-[#EA4335] transition-all duration-200 ${
+          active ? 'h-5 animate-bounce [animation-delay:0.15s]' : 'h-[16px]'
         }`}
       />
       <span
-        className={`w-1 rounded-full bg-[#FBBC05] transition-all duration-200 ${
-          active ? 'h-4.5 animate-bounce [animation-delay:0.3s]' : 'h-3'
+        className={`w-[3px] rounded-full bg-[#FBBC05] transition-all duration-200 ${
+          active ? 'h-4.5 animate-bounce [animation-delay:0.3s]' : 'h-[13px]'
         }`}
       />
       <span
-        className={`w-1 rounded-full bg-[#34A853] transition-all duration-200 ${
-          active ? 'h-3.5 animate-bounce [animation-delay:0.45s]' : 'h-2'
+        className={`w-[3px] rounded-full bg-[#34A853] transition-all duration-200 ${
+          active ? 'h-3.5 animate-bounce [animation-delay:0.45s]' : 'h-[8.5px]'
         }`}
       />
     </div>
