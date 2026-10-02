@@ -329,10 +329,10 @@ export default function App() {
 
   return (
     <div
-      className={`w-full min-h-screen select-none ${
+      className={`w-full min-h-screen select-none bg-transparent ${
         remoteMode === 'mini' || isPip
-          ? 'bg-transparent pointer-events-none'
-          : 'bg-[#EDEDF0] text-slate-800 flex flex-col justify-center items-center overflow-x-hidden'
+          ? 'pointer-events-none'
+          : 'text-slate-800 flex flex-col justify-center items-center overflow-x-hidden'
       }`}
     >
       {/* 
