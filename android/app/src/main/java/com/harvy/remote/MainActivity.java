@@ -46,6 +46,9 @@ public class MainActivity extends BridgeActivity {
                     settings.setCacheMode(WebSettings.LOAD_DEFAULT);
                 }
 
+                NativeTVManager tvManager = new NativeTVManager(MainActivity.this, webView);
+                webView.addJavascriptInterface(tvManager, "NativeTVManager");
+
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enterPip() {
@@ -68,6 +71,36 @@ public class MainActivity extends BridgeActivity {
                     @JavascriptInterface
                     public boolean isPipSupported() {
                         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+                    }
+
+                    @JavascriptInterface
+                    public void sendAction(String brand, String ip, int port, String action) {
+                        tvManager.sendAction(brand, ip, port, action);
+                    }
+
+                    @JavascriptInterface
+                    public void startScan() {
+                        tvManager.startScan();
+                    }
+
+                    @JavascriptInterface
+                    public void launchApp(String brand, String ip, int port, String appSlug) {
+                        tvManager.launchApp(brand, ip, port, appSlug);
+                    }
+
+                    @JavascriptInterface
+                    public void pingDevice(String ip, int port) {
+                        tvManager.pingDevice(ip, port);
+                    }
+
+                    @JavascriptInterface
+                    public void sendTextInput(String brand, String ip, int port, String text) {
+                        tvManager.sendTextInput(brand, ip, port, text);
+                    }
+
+                    @JavascriptInterface
+                    public String getDeviceSubnet() {
+                        return tvManager.getDeviceSubnet();
                     }
                 }, "AndroidNativeBridge");
             }

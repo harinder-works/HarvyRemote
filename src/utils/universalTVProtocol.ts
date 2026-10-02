@@ -231,6 +231,9 @@ export const BRAND_APP_MAPPINGS: Record<
 class UniversalTVClient {
   private activeDevice: SmartTVDevice | null = null;
   private listeners: ((log: UniversalCommandLog) => void)[] = [];
+  private discoveryListeners: ((device: SmartTVDevice) => void)[] = [];
+  private scanFinishListeners: ((count: number, subnet: string) => void)[] = [];
+  private pingListeners: ((ip: string, isConnected: boolean, latencyMs: number) => void)[] = [];
 
   constructor() {
     try {
@@ -240,6 +243,44 @@ class UniversalTVClient {
       }
     } catch {
       // ignore
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tv-discovered', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          this.discoveryListeners.forEach((fn) => fn(e.detail));
+        }
+      }) as EventListener);
+
+      window.addEventListener('tv-scan-finished', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          this.scanFinishListeners.forEach((fn) => fn(e.detail.foundCount || 0, e.detail.subnet || ''));
+        }
+      }) as EventListener);
+
+      window.addEventListener('tv-ping-result', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          const { ip, isConnected, latencyMs } = e.detail;
+          if (this.activeDevice && this.activeDevice.ip === ip) {
+            this.activeDevice.isConnected = isConnected;
+            this.activeDevice.lastPingMs = latencyMs;
+          }
+          this.pingListeners.forEach((fn) => fn(ip, isConnected, latencyMs));
+        }
+      }) as EventListener);
+
+      window.addEventListener('tv-command-result', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          const { action, brand, ip, success, latencyMs, protocol } = e.detail;
+          this.emitLog(
+            action,
+            protocol || 'Direct Network Protocol',
+            `${brand.toUpperCase()} (${ip}) -> ${success ? 'ACK OK' : 'NO RESPONSE'}`,
+            latencyMs || 22,
+            success ? 'ack' : 'failed'
+          );
+        }
+      }) as EventListener);
     }
   }
 
@@ -263,11 +304,47 @@ class UniversalTVClient {
     };
   }
 
+  public onDeviceDiscovered(callback: (device: SmartTVDevice) => void) {
+    this.discoveryListeners.push(callback);
+    return () => {
+      this.discoveryListeners = this.discoveryListeners.filter((fn) => fn !== callback);
+    };
+  }
+
+  public onScanFinished(callback: (count: number, subnet: string) => void) {
+    this.scanFinishListeners.push(callback);
+    return () => {
+      this.scanFinishListeners = this.scanFinishListeners.filter((fn) => fn !== callback);
+    };
+  }
+
+  public onPingResult(callback: (ip: string, isConnected: boolean, latencyMs: number) => void) {
+    this.pingListeners.push(callback);
+    return () => {
+      this.pingListeners = this.pingListeners.filter((fn) => fn !== callback);
+    };
+  }
+
+  public startScan() {
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.startScan === 'function') {
+      bridge.startScan();
+    }
+  }
+
+  public pingDevice(ip: string, port = 8060) {
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.pingDevice === 'function') {
+      bridge.pingDevice(ip, port);
+    }
+  }
+
   private emitLog(
     command: string,
     wireProtocol: string,
     payload: string,
-    latencyMs = 26
+    latencyMs = 26,
+    status: 'ack' | 'failed' | 'sent' = 'ack'
   ) {
     const brand = this.activeDevice?.brand || 'google_tv';
     const log: UniversalCommandLog = {
@@ -284,7 +361,7 @@ class UniversalTVClient {
       targetDevice: this.activeDevice
         ? `${this.activeDevice.name} (${this.activeDevice.ip})`
         : 'Smart TV',
-      status: 'ack',
+      status,
       latencyMs,
     };
 
@@ -431,25 +508,35 @@ class UniversalTVClient {
       }
     }
 
-    // Direct HTTP/WebSocket transmission (non-blocking with fast abort)
-    try {
-      if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.hostname.includes('localhost')) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 120);
-        fetch('/api/tv/send-action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            brand,
-            ip,
-            action,
-            payload,
-          }),
-          signal: controller.signal,
-        }).catch(() => {}).finally(() => clearTimeout(tid));
+    // Call Android Native TV Manager over bridge
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.sendAction === 'function') {
+      try {
+        bridge.sendAction(brand, ip, this.activeDevice?.port || 6467, action);
+      } catch (err) {
+        console.error('Bridge sendAction failed', err);
       }
-    } catch {
-      // handled
+    } else {
+      // Direct HTTP fallback in browser development preview
+      try {
+        if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.hostname.includes('localhost')) {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 120);
+          fetch('/api/tv/send-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              brand,
+              ip,
+              action,
+              payload,
+            }),
+            signal: controller.signal,
+          }).catch(() => {}).finally(() => clearTimeout(tid));
+        }
+      } catch {
+        // handled
+      }
     }
 
     const elapsed = Math.round(performance.now() - startTime) || Math.floor(Math.random() * 12 + 18);
@@ -463,6 +550,7 @@ class UniversalTVClient {
   public async launchApp(appSlug: string, customAppId?: string): Promise<boolean> {
     const brand = this.activeDevice?.brand || 'google_tv';
     const ip = this.activeDevice?.ip || '192.168.1.105';
+    const port = this.activeDevice?.port || 6467;
     const startTime = performance.now();
 
     const brandMappings = BRAND_APP_MAPPINGS[brand] || BRAND_APP_MAPPINGS.google_tv;
@@ -492,19 +580,13 @@ class UniversalTVClient {
         break;
     }
 
-    try {
-      if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.hostname.includes('localhost')) {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 120);
-        fetch('/api/tv/launch-app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ brand, ip, targetApp, payload }),
-          signal: controller.signal,
-        }).catch(() => {}).finally(() => clearTimeout(tid));
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.launchApp === 'function') {
+      try {
+        bridge.launchApp(brand, ip, port, appSlug);
+      } catch (err) {
+        console.error('Bridge launchApp failed', err);
       }
-    } catch {
-      // handled
     }
 
     const elapsed = Math.round(performance.now() - startTime) || 38;
@@ -518,6 +600,7 @@ class UniversalTVClient {
   public async sendVoiceSearch(query: string): Promise<boolean> {
     const brand = this.activeDevice?.brand || 'google_tv';
     const ip = this.activeDevice?.ip || '192.168.1.105';
+    const port = this.activeDevice?.port || 6467;
     const startTime = performance.now();
 
     let wireProtocol = '';
@@ -547,6 +630,11 @@ class UniversalTVClient {
         break;
     }
 
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.sendTextInput === 'function') {
+      bridge.sendTextInput(brand, ip, port, query);
+    }
+
     const elapsed = Math.round(performance.now() - startTime) || 45;
     this.emitLog('VOICE_SEARCH', wireProtocol, payload, elapsed);
     return true;
@@ -558,6 +646,7 @@ class UniversalTVClient {
   public async sendTextInput(text: string): Promise<boolean> {
     const brand = this.activeDevice?.brand || 'google_tv';
     const ip = this.activeDevice?.ip || '192.168.1.105';
+    const port = this.activeDevice?.port || 6467;
 
     let wireProtocol = '';
     let payload = '';
@@ -568,6 +657,11 @@ class UniversalTVClient {
     } else {
       wireProtocol = `${brand.toUpperCase()} Input Text`;
       payload = `input text "${text.replace(/"/g, '\\"')}"`;
+    }
+
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.sendTextInput === 'function') {
+      bridge.sendTextInput(brand, ip, port, text);
     }
 
     this.emitLog('INPUT_TEXT', wireProtocol, payload, 30);

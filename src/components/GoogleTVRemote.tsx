@@ -87,7 +87,7 @@ export function GoogleTVRemote({
   const pressTimer = useRef<number | null>(null);
   const isLongPressTriggered = useRef<boolean>(false);
 
-  const triggerLed = () => {
+  const triggerLed = (_label?: string) => {
     if (ledRef.current) {
       ledRef.current.style.backgroundColor = '#38bdf8';
       ledRef.current.style.boxShadow = '0 0 12px #38bdf8';

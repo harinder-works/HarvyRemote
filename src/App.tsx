@@ -72,19 +72,21 @@ export default function App() {
 
   // Active connected Smart TV
   const [connectedDevice, setConnectedDevice] = useState<SmartTVDevice | null>(() => {
-    return (
-      universalTV.getActiveDevice() || {
-        id: 'chromecast-living-room',
-        name: 'Living Room TV',
-        brand: 'google_tv',
-        ip: '192.168.1.105',
-        port: 6467,
-        model: 'Google TV 4K',
-        isPaired: true,
-        isConnected: true,
-        lastPingMs: 24,
+    const active = universalTV.getActiveDevice();
+    if (active) return active;
+    try {
+      const saved = localStorage.getItem('saved_smart_tv_devices');
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list) && list.length > 0) {
+          universalTV.setActiveDevice(list[0]);
+          return list[0];
+        }
       }
-    );
+    } catch {
+      // ignore
+    }
+    return null;
   });
 
   // Customizable Hardware App Shortcut 1 & 2 (Key 1 & Key 2)
