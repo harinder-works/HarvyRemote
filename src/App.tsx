@@ -328,8 +328,8 @@ export default function App() {
   return (
     <div
       className={`w-full min-h-screen select-none ${
-        isPip
-          ? 'bg-transparent flex items-center justify-center p-0 overflow-hidden'
+        remoteMode === 'mini' || isPip
+          ? 'bg-transparent pointer-events-none'
           : 'bg-[#EDEDF0] text-slate-800 flex flex-col justify-center items-center overflow-x-hidden'
       }`}
     >
@@ -383,26 +383,25 @@ export default function App() {
 
       {/* 
         MINI REMOTE MODE:
-        Nothing on screen except the draggable white mini remote floating in the corner!
+        Draggable white mini remote floating freely with transparent background passthrough!
       */}
       {remoteMode === 'mini' && (
-        <div className="pointer-events-auto">
-          <MiniRemote
-            isOpen={true}
-            theme={theme}
-            onExpand={handleExitFloating}
-            onDpadPress={handleDpadPress}
-            onSelectPress={handleSelectPress}
-            onBackPress={handleBackPress}
-            onHomePress={handleHomePress}
-            onVoicePress={handleVoicePress}
-            onMutePress={handleMutePress}
-            onPowerPress={handlePowerPress}
-            onVolumeChange={handleVolumeChange}
-            isListening={isVoiceActive}
-            isTVOn={true}
-          />
-        </div>
+        <MiniRemote
+          isOpen={true}
+          theme={theme}
+          isPip={isPip}
+          onExpand={handleExitFloating}
+          onDpadPress={handleDpadPress}
+          onSelectPress={handleSelectPress}
+          onBackPress={handleBackPress}
+          onHomePress={handleHomePress}
+          onVoicePress={handleVoicePress}
+          onMutePress={handleMutePress}
+          onPowerPress={handlePowerPress}
+          onVolumeChange={handleVolumeChange}
+          isListening={isVoiceActive}
+          isTVOn={true}
+        />
       )}
 
       {/* MODALS: Mount on-demand only when opened to keep DOM and memory minimal */}
