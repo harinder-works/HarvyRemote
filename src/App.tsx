@@ -356,9 +356,9 @@ export default function App() {
         </div>
       )}
 
-      {/* FULL REMOTE MODE: Large authentic Google TV remote filling the screen */}
+      {/* FULL REMOTE MODE: Centered on screen, safely padded away from phone's top tray & bottom menu */}
       {remoteMode === 'full' && (
-        <div className="w-full h-full min-h-screen flex-1 flex flex-col items-center justify-center pointer-events-auto">
+        <div className="w-full min-h-screen flex flex-col items-center justify-center safe-area-container pointer-events-auto overflow-y-auto">
           <GoogleTVRemote
             theme={theme}
             shortcut1={shortcut1}

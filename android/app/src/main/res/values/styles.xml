@@ -13,6 +13,7 @@
         <item name="android:navigationBarColor">#EDEDF0</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:fitsSystemWindows">true</item>
     </style>
 
     <style name="AppTheme.NoActionBar" parent="AppTheme">

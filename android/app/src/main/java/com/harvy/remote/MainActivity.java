@@ -27,9 +27,11 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
             getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#EDEDF0")));
+            getWindow().getDecorView().setFitsSystemWindows(true);
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
+                webView.setFitsSystemWindows(true);
                 webView.setBackgroundColor(Color.parseColor("#EDEDF0"));
 
                 // Hardware compositing layer for 60/120fps UI

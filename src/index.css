@@ -122,3 +122,11 @@ html, body, #root {
   scrollbar-width: thin;
   scrollbar-color: #C4CAD1 transparent;
 }
+
+/* Safe area insets container to protect from system bars */
+.safe-area-container {
+  padding-top: max(env(safe-area-inset-top, 0px), 20px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  padding-left: max(env(safe-area-inset-left, 0px), 12px);
+  padding-right: max(env(safe-area-inset-right, 0px), 12px);
+}
