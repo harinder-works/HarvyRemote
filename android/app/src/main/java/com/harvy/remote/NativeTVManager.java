@@ -819,7 +819,7 @@ public class NativeTVManager {
 
                 ByteArrayOutputStream frame = new ByteArrayOutputStream();
                 frame.write(0x81);
-                byte[] mask = new byte[]{0x22, 0x44, 0x66, 0x88};
+                byte[] mask = new byte[]{0x22, 0x44, 0x66, (byte) 0x88};
                 frame.write(0x80 | payloadBytes.length);
                 frame.write(mask);
                 for (int i = 0; i < payloadBytes.length; i++) {
