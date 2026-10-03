@@ -47,25 +47,13 @@ export default function App() {
   }, []);
 
   const handleEnterFloating = () => {
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
-      try {
-        (window as any).AndroidNativeBridge.enterPip();
-      } catch {
-        setRemoteMode('mini');
-      }
-    } else {
-      setRemoteMode('mini');
-    }
+    sound.playClick('mode');
+    setRemoteMode('mini');
+    setIsPip(false);
   };
 
   const handleExitFloating = () => {
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.exitPip) {
-      try {
-        (window as any).AndroidNativeBridge.exitPip();
-      } catch {
-        // ignore
-      }
-    }
+    sound.playClick('mode');
     setRemoteMode('full');
     setIsPip(false);
   };
@@ -344,8 +332,8 @@ export default function App() {
   return (
     <div
       className={`w-full min-h-screen select-none bg-transparent ${
-        remoteMode === 'mini' || isPip
-          ? 'pointer-events-none'
+        remoteMode === 'mini'
+          ? 'overflow-hidden'
           : 'text-slate-800 flex flex-col justify-center items-center overflow-x-hidden'
       }`}
     >
@@ -405,7 +393,7 @@ export default function App() {
         <MiniRemote
           isOpen={true}
           theme={theme}
-          isPip={isPip}
+          isPip={false}
           onExpand={handleExitFloating}
           onDpadPress={handleDpadPress}
           onSelectPress={handleSelectPress}
@@ -417,6 +405,7 @@ export default function App() {
           onVolumeChange={handleVolumeChange}
           isListening={isVoiceActive}
           isTVOn={true}
+          connectedDevice={connectedDevice}
         />
       )}
 

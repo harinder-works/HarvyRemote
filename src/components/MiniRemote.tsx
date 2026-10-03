@@ -14,6 +14,7 @@ import {
 import { GoogleDots, GoogleAssistantLines } from './BrandIcons';
 import { sound } from '../utils/audio';
 import { RemoteTheme } from '../types/remote';
+import { SmartTVDevice } from '../utils/universalTVProtocol';
 
 interface MiniRemoteProps {
   isOpen: boolean;
@@ -30,11 +31,11 @@ interface MiniRemoteProps {
   onVolumeChange: (delta: number) => void;
   isListening: boolean;
   isTVOn: boolean;
+  connectedDevice?: SmartTVDevice | null;
 }
 
 export function MiniRemote({
   isOpen,
-  isPip = false,
   onExpand,
   onDpadPress,
   onSelectPress,
@@ -45,6 +46,7 @@ export function MiniRemote({
   onPowerPress,
   onVolumeChange,
   isListening,
+  connectedDevice,
 }: MiniRemoteProps) {
   if (!isOpen) return null;
 
@@ -146,9 +148,14 @@ export function MiniRemote({
     >
       {/* Top Controls (Power & Expand) */}
       <div className="w-full flex items-center justify-between pb-1 mb-1 border-b border-black/10 select-none cursor-grab active:cursor-grabbing">
-        <div className="flex items-center gap-1 pl-1 py-0.5">
-          <GripHorizontal className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Google TV</span>
+        <div className="flex items-center gap-1 pl-1 py-0.5 min-w-0 max-w-[85px]">
+          <GripHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 truncate">
+            {connectedDevice ? connectedDevice.name : 'Google TV'}
+          </span>
+          {connectedDevice?.isConnected && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          )}
         </div>
 
         <div className="flex items-center gap-1">
@@ -327,16 +334,7 @@ export function MiniRemote({
     </div>
   );
 
-  // When inside native Android Picture-in-Picture mode (OS handles window movement)
-  if (isPip) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-1 select-none overflow-hidden bg-transparent">
-        {pebbleContent}
-      </div>
-    );
-  }
-
-  // When in in-app floating mode: freely draggable anywhere across the screen
+  // In-app floating mode: freely draggable anywhere across the screen with interactive buttons
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden select-none bg-transparent">
       <div
