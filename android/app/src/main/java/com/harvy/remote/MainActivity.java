@@ -101,6 +101,16 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
+                    public void startPairing(String ip) {
+                        tvManager.startPairing(ip);
+                    }
+
+                    @JavascriptInterface
+                    public void submitPairingPin(String ip, String pin) {
+                        tvManager.submitPairingPin(ip, pin);
+                    }
+
+                    @JavascriptInterface
                     public String getDeviceSubnet() {
                         return tvManager.getDeviceSubnet();
                     }

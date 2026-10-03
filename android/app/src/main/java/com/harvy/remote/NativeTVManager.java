@@ -8,6 +8,8 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
@@ -17,81 +19,671 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.HttpURLConnection;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.MulticastSocket;
-import java.net.NetworkInterface;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import javax.security.auth.x500.X500Principal;
 
+/**
+ * NativeTVManager handles direct local-network TV discovery and hardware command execution
+ * for Google TV (Android TV Remote v2 over TLS mTLS), Samsung (Tizen WebSocket),
+ * LG (webOS SSAP WebSocket), Roku (ECP REST), Fire TV, and Universal Smart TVs.
+ */
 public class NativeTVManager {
     private static final String TAG = "NativeTVManager";
+    private static final String KEY_ALIAS = "HarvyRemoteGtvKey_v2";
+
     private final Context context;
     private final WebView webView;
-    private ExecutorService scanExecutor;
-    private final ExecutorService commandExecutor = Executors.newCachedThreadPool();
-    private final Set<String> discoveredIps = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+    private final ExecutorService scanExecutor = Executors.newFixedThreadPool(16);
+    private final ExecutorService commandExecutor = Executors.newFixedThreadPool(4);
+    private final Set<String> discoveredIps = Collections.synchronizedSet(new HashSet<>());
     private WifiManager.MulticastLock multicastLock;
+
+    // Google TV TLS & Pairing session
+    private SSLContext gtvSslContext = null;
+    private SSLSocket pairingSocket = null;
+    private BigInteger currentServerModulus = null;
+    private BigInteger currentServerExponent = null;
+    private String currentPairingIp = null;
+
+    // Persistent live remote socket to Google TV (Port 6466) for instant, low-latency keypresses
+    private SSLSocket activeRemoteSocket = null;
+    private String activeRemoteIp = null;
 
     public NativeTVManager(Context context, WebView webView) {
         this.context = context;
         this.webView = webView;
+        // Warm up SSL context and keystore in background thread
+        commandExecutor.submit(this::initGtvSslContext);
     }
 
-    private void dispatchJSEvent(String eventName, JSONObject jsonDetail) {
+    /**
+     * Dispatch an event to JavaScript in the WebView safely on UI thread.
+     */
+    private void dispatchJSEvent(String eventName, JSONObject data) {
         if (webView == null) return;
         webView.post(() -> {
+            String jsonStr = data != null ? data.toString() : "{}";
+            String script = "window.dispatchEvent(new CustomEvent('" + eventName + "', { detail: " + jsonStr + " }));";
+            webView.evaluateJavascript(script, null);
+        });
+    }
+
+    // =========================================================================
+    // GOOGLE TV KEYSTORE & MUTUAL TLS (mTLS) MANAGEMENT
+    // =========================================================================
+
+    private synchronized SSLContext initGtvSslContext() {
+        if (gtvSslContext != null) {
+            return gtvSslContext;
+        }
+        try {
+            KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
+            ks.load(null);
+
+            if (!ks.containsAlias(KEY_ALIAS)) {
+                KeyPairGenerator kpg = KeyPairGenerator.getInstance(
+                        KeyProperties.KEY_ALGORITHM_RSA, "AndroidKeyStore");
+                KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
+                        KEY_ALIAS,
+                        KeyProperties.PURPOSE_SIGN | KeyProperties.PURPOSE_VERIFY)
+                        .setDigests(KeyProperties.DIGEST_SHA256)
+                        .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
+                        .setCertificateSubject(new X500Principal("CN=atvremote, O=GoogleTV, C=US"))
+                        .setCertificateSerialNumber(BigInteger.valueOf(System.currentTimeMillis()))
+                        .setCertificateNotBefore(new Date(System.currentTimeMillis() - 24L * 60 * 60 * 1000))
+                        .setCertificateNotAfter(new Date(System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000))
+                        .build();
+                kpg.initialize(spec);
+                kpg.generateKeyPair();
+                Log.d(TAG, "Generated fresh client certificate in AndroidKeyStore for Google TV Remote");
+            }
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, null);
+
+            TrustManager[] trustAll = new TrustManager[]{
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+                    }
+            };
+
+            SSLContext sc = SSLContext.getInstance("TLS");
+            sc.init(kmf.getKeyManagers(), trustAll, new SecureRandom());
+            gtvSslContext = sc;
+            return gtvSslContext;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed creating KeyStore SSLContext", e);
+            return null;
+        }
+    }
+
+    private BigInteger[] getClientModulusAndExponent() {
+        try {
+            KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
+            ks.load(null);
+            Certificate cert = ks.getCertificate(KEY_ALIAS);
+            if (cert != null && cert.getPublicKey() instanceof RSAPublicKey) {
+                RSAPublicKey rsa = (RSAPublicKey) cert.getPublicKey();
+                return new BigInteger[]{ rsa.getModulus(), rsa.getPublicExponent() };
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting client pubkey", e);
+        }
+        return null;
+    }
+
+    // =========================================================================
+    // GOOGLE TV PAIRING (Port 6467)
+    // =========================================================================
+
+    /**
+     * Start the official Google TV Remote pairing handshake on Port 6467.
+     * The TV will immediately pop up a 6-character PIN code on its screen.
+     */
+    @JavascriptInterface
+    public void startPairing(String ip) {
+        commandExecutor.submit(() -> {
             try {
-                String detailStr = jsonDetail != null ? jsonDetail.toString() : "{}";
-                String script = "window.dispatchEvent(new CustomEvent('" + eventName + "', { detail: " + detailStr + " }));";
-                webView.evaluateJavascript(script, null);
+                if (pairingSocket != null) {
+                    try { pairingSocket.close(); } catch (Exception e) {}
+                    pairingSocket = null;
+                }
+
+                SSLContext sc = initGtvSslContext();
+                if (sc == null) {
+                    notifyPairStatus(ip, false, "Could not initialize secure certificate");
+                    return;
+                }
+
+                Log.d(TAG, "Connecting to Google TV pairing port 6467 on " + ip + "...");
+                SSLSocket socket = (SSLSocket) sc.getSocketFactory().createSocket();
+                socket.setSoTimeout(15000);
+                socket.connect(new InetSocketAddress(ip, 6467), 4000);
+                socket.startHandshake();
+
+                Certificate[] peerCerts = socket.getSession().getPeerCertificates();
+                if (peerCerts != null && peerCerts.length > 0 && peerCerts[0].getPublicKey() instanceof RSAPublicKey) {
+                    RSAPublicKey serverPubKey = (RSAPublicKey) peerCerts[0].getPublicKey();
+                    currentServerModulus = serverPubKey.getModulus();
+                    currentServerExponent = serverPubKey.getPublicExponent();
+                }
+
+                OutputStream os = socket.getOutputStream();
+                InputStream is = socket.getInputStream();
+
+                // 1. Send PairingRequest
+                byte[] pairingReq = buildPairingRequestMessage("atvremote", "HarvyRemote");
+                sendLengthPrefixed(os, pairingReq);
+
+                // 2. Read PairingRequestAck
+                byte[] ack1 = readLengthPrefixed(is);
+                if (ack1 == null) {
+                    notifyPairStatus(ip, false, "TV closed pairing connection");
+                    socket.close();
+                    return;
+                }
+
+                // 3. Send Options (ROLE_INPUT, HEXADECIMAL, length 6)
+                byte[] optionsMsg = buildOptionsMessage();
+                sendLengthPrefixed(os, optionsMsg);
+
+                // 4. Read TV Options response
+                byte[] tvOptions = readLengthPrefixed(is);
+                if (tvOptions == null) {
+                    notifyPairStatus(ip, false, "TV did not send pairing options");
+                    socket.close();
+                    return;
+                }
+
+                // 5. Send Configuration (Hexadecimal, 6 characters, Role: Input)
+                byte[] configMsg = buildConfigurationMessage();
+                sendLengthPrefixed(os, configMsg);
+
+                // 6. Read ConfigurationAck
+                byte[] ack2 = readLengthPrefixed(is);
+                if (ack2 == null) {
+                    notifyPairStatus(ip, false, "TV rejected configuration");
+                    socket.close();
+                    return;
+                }
+
+                // PIN is now officially displayed on the TV screen!
+                pairingSocket = socket;
+                currentPairingIp = ip;
+
+                JSONObject detail = new JSONObject();
+                detail.put("ip", ip);
+                detail.put("status", "code_displayed");
+                dispatchJSEvent("tv-pairing-code-requested", detail);
+                Log.i(TAG, "TV has displayed 6-character pairing code on screen for " + ip);
             } catch (Exception e) {
-                Log.e(TAG, "Failed dispatching event: " + eventName, e);
+                Log.e(TAG, "startPairing failed for " + ip, e);
+                notifyPairStatus(ip, false, "Could not connect to TV: " + e.getMessage());
             }
         });
     }
 
     /**
-     * Determines the active Wi-Fi or LAN IPv4 address of this Android device.
-     * Accurately avoids cellular rmnet / dummy interfaces.
+     * Submit the 6-character PIN shown on the TV to complete Google TV pairing.
      */
-    private String getLocalIpAddress() {
+    @JavascriptInterface
+    public void submitPairingPin(String ip, String pin) {
+        commandExecutor.submit(() -> {
+            try {
+                if (pairingSocket == null || pairingSocket.isClosed()) {
+                    notifyPairStatus(ip, false, "Pairing session expired. Please tap Connect again.");
+                    return;
+                }
+
+                String cleanPin = pin.trim().toUpperCase();
+                if (cleanPin.length() != 6) {
+                    notifyPairStatus(ip, false, "Code must be 6 characters");
+                    return;
+                }
+
+                BigInteger[] clientKeys = getClientModulusAndExponent();
+                if (clientKeys == null || currentServerModulus == null || currentServerExponent == null) {
+                    notifyPairStatus(ip, false, "Certificate keys missing");
+                    return;
+                }
+
+                // Calculate SHA-256 secret hash according to Polo pairing protocol:
+                // h = sha256(client_modulus_hex + 0 + client_exp_hex + server_modulus_hex + 0 + server_exp_hex + pin[2:])
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                md.update(hexStringToByteArray(clientKeys[0].toString(16)));
+                md.update(hexStringToByteArray("0" + clientKeys[1].toString(16)));
+                md.update(hexStringToByteArray(currentServerModulus.toString(16)));
+                md.update(hexStringToByteArray("0" + currentServerExponent.toString(16)));
+                md.update(hexStringToByteArray(cleanPin.substring(2)));
+                byte[] hashResult = md.digest();
+
+                OutputStream os = pairingSocket.getOutputStream();
+                InputStream is = pairingSocket.getInputStream();
+
+                // Send Secret message
+                byte[] secretMsg = buildSecretMessage(hashResult);
+                sendLengthPrefixed(os, secretMsg);
+
+                // Read SecretAck
+                byte[] ack = readLengthPrefixed(is);
+                if (ack != null) {
+                    Log.i(TAG, "Successfully paired with Google TV at " + ip);
+                    notifyPairStatus(ip, true, "TV Paired Successfully!");
+                    try { pairingSocket.close(); } catch (Exception e) {}
+                    pairingSocket = null;
+                } else {
+                    notifyPairStatus(ip, false, "Incorrect code entered. Please try again.");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "submitPairingPin failed", e);
+                notifyPairStatus(ip, false, "Pairing error: " + e.getMessage());
+            }
+        });
+    }
+
+    private void notifyPairStatus(String ip, boolean success, String message) {
+        try {
+            JSONObject res = new JSONObject();
+            res.put("ip", ip);
+            res.put("success", success);
+            res.put("message", message);
+            dispatchJSEvent("tv-pair-status", res);
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
+    // =========================================================================
+    // GOOGLE TV REMOTE CONTROL (Port 6466)
+    // =========================================================================
+
+    private synchronized SSLSocket getOrCreateRemoteSocket(String ip) {
+        try {
+            if (activeRemoteSocket != null && !activeRemoteSocket.isClosed() && ip.equals(activeRemoteIp)) {
+                return activeRemoteSocket;
+            }
+
+            if (activeRemoteSocket != null) {
+                try { activeRemoteSocket.close(); } catch (Exception e) {}
+                activeRemoteSocket = null;
+            }
+
+            SSLContext sc = initGtvSslContext();
+            if (sc == null) return null;
+
+            SSLSocket socket = (SSLSocket) sc.getSocketFactory().createSocket();
+            socket.setSoTimeout(4000);
+            socket.connect(new InetSocketAddress(ip, 6466), 2500);
+            socket.startHandshake();
+
+            InputStream is = socket.getInputStream();
+            OutputStream os = socket.getOutputStream();
+
+            // Port 6466 handshake:
+            // TV sends remote_configure (tag 1)
+            byte[] tvCfg = readLengthPrefixed(is);
+            if (tvCfg != null) {
+                // Client responds with remote_configure
+                byte[] clientCfg = buildRemoteConfigureResponse();
+                sendLengthPrefixed(os, clientCfg);
+
+                // TV sends remote_set_active (tag 2)
+                byte[] tvActive = readLengthPrefixed(is);
+                if (tvActive != null) {
+                    byte[] clientActive = buildRemoteSetActiveResponse();
+                    sendLengthPrefixed(os, clientActive);
+                }
+            }
+
+            activeRemoteSocket = socket;
+            activeRemoteIp = ip;
+            Log.d(TAG, "Active remote session established on Port 6466 with " + ip);
+            return activeRemoteSocket;
+        } catch (Exception e) {
+            Log.w(TAG, "Could not open remote session to " + ip + ":6466: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean sendGoogleTvKey(String ip, int keycode) {
+        try {
+            SSLSocket socket = getOrCreateRemoteSocket(ip);
+            if (socket == null) {
+                // TV is not paired or port 6466 was rejected
+                return false;
+            }
+
+            OutputStream os = socket.getOutputStream();
+            byte[] keyMsg = buildRemoteKeyInjectMessage(keycode, 3); // 3 = SHORT
+            sendLengthPrefixed(os, keyMsg);
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "sendGoogleTvKey failed, resetting socket: " + e.getMessage());
+            try {
+                if (activeRemoteSocket != null) activeRemoteSocket.close();
+            } catch (Exception ex) {}
+            activeRemoteSocket = null;
+            return false;
+        }
+    }
+
+    // =========================================================================
+    // PROTOBUF SERIALIZATION HELPERS
+    // =========================================================================
+
+    private void writeVarint(OutputStream out, int value) throws IOException {
+        while ((value & 0xFFFFFF80) != 0) {
+            out.write((value & 0x7F) | 0x80);
+            value >>>= 7;
+        }
+        out.write(value & 0x7F);
+    }
+
+    private void sendLengthPrefixed(OutputStream out, byte[] msg) throws IOException {
+        ByteArrayOutputStream frame = new ByteArrayOutputStream();
+        writeVarint(frame, msg.length);
+        frame.write(msg);
+        out.write(frame.toByteArray());
+        out.flush();
+    }
+
+    private byte[] readLengthPrefixed(InputStream in) {
+        try {
+            int length = readVarint(in);
+            if (length <= 0 || length > 65536) return null;
+            byte[] buf = new byte[length];
+            int total = 0;
+            while (total < length) {
+                int r = in.read(buf, total, length - total);
+                if (r < 0) return null;
+                total += r;
+            }
+            return buf;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private int readVarint(InputStream in) throws IOException {
+        int value = 0;
+        int shift = 0;
+        while (shift < 32) {
+            int b = in.read();
+            if (b < 0) throw new EOFException();
+            value |= (b & 0x7F) << shift;
+            if ((b & 0x80) == 0) return value;
+            shift += 7;
+        }
+        throw new IOException("Varint too long");
+    }
+
+    private byte[] hexStringToByteArray(String s) {
+        if (s == null) return new byte[0];
+        s = s.trim();
+        if (s.length() % 2 != 0) {
+            s = "0" + s;
+        }
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                    + Character.digit(s.charAt(i + 1), 16));
+        }
+        return data;
+    }
+
+    private byte[] buildPairingRequestMessage(String serviceName, String clientName) throws IOException {
+        ByteArrayOutputStream req = new ByteArrayOutputStream();
+        req.write(0x0A); // field 1: service_name
+        byte[] svc = serviceName.getBytes(StandardCharsets.UTF_8);
+        writeVarint(req, svc.length);
+        req.write(svc);
+
+        req.write(0x12); // field 2: client_name
+        byte[] cli = clientName.getBytes(StandardCharsets.UTF_8);
+        writeVarint(req, cli.length);
+        req.write(cli);
+
+        byte[] reqBytes = req.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x08); // field 1: protocol_version = 2
+        writeVarint(outer, 2);
+        outer.write(0x10); // field 2: status = 200
+        writeVarint(outer, 200);
+        outer.write(0x52); // field 10: pairing_request ((10 << 3) | 2 = 82 = 0x52)
+        writeVarint(outer, reqBytes.length);
+        outer.write(reqBytes);
+
+        return outer.toByteArray();
+    }
+
+    private byte[] buildOptionsMessage() throws IOException {
+        ByteArrayOutputStream enc = new ByteArrayOutputStream();
+        enc.write(0x08); // type = 3 (HEXADECIMAL)
+        writeVarint(enc, 3);
+        enc.write(0x10); // symbol_length = 6
+        writeVarint(enc, 6);
+        byte[] encBytes = enc.toByteArray();
+
+        ByteArrayOutputStream opt = new ByteArrayOutputStream();
+        opt.write(0x0A); // field 1: input_encodings
+        writeVarint(opt, encBytes.length);
+        opt.write(encBytes);
+        opt.write(0x18); // field 3: preferred_role = 1 (ROLE_TYPE_INPUT)
+        writeVarint(opt, 1);
+        byte[] optBytes = opt.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x08); // protocol_version = 2
+        writeVarint(outer, 2);
+        outer.write(0x10); // status = 200
+        writeVarint(outer, 200);
+        outer.write(0xA2); // field 20: options ((20 << 3) | 2 = 162 = 0xA2, 0x01)
+        outer.write(0x01);
+        writeVarint(outer, optBytes.length);
+        outer.write(optBytes);
+
+        return outer.toByteArray();
+    }
+
+    private byte[] buildConfigurationMessage() throws IOException {
+        ByteArrayOutputStream enc = new ByteArrayOutputStream();
+        enc.write(0x08); // type = 3 (HEXADECIMAL)
+        writeVarint(enc, 3);
+        enc.write(0x10); // symbol_length = 6
+        writeVarint(enc, 6);
+        byte[] encBytes = enc.toByteArray();
+
+        ByteArrayOutputStream cfg = new ByteArrayOutputStream();
+        cfg.write(0x0A); // field 1: encoding
+        writeVarint(cfg, encBytes.length);
+        cfg.write(encBytes);
+        cfg.write(0x10); // field 2: client_role = 1 (ROLE_INPUT)
+        writeVarint(cfg, 1);
+        byte[] cfgBytes = cfg.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x08); // protocol_version = 2
+        writeVarint(outer, 2);
+        outer.write(0x10); // status = 200
+        writeVarint(outer, 200);
+        outer.write(0xF2); // field 30: configuration ((30 << 3) | 2 = 242 = 0xF2, 0x01)
+        outer.write(0x01);
+        writeVarint(outer, cfgBytes.length);
+        outer.write(cfgBytes);
+
+        return outer.toByteArray();
+    }
+
+    private byte[] buildSecretMessage(byte[] hashResult) throws IOException {
+        ByteArrayOutputStream sec = new ByteArrayOutputStream();
+        sec.write(0x0A); // field 1: secret
+        writeVarint(sec, hashResult.length);
+        sec.write(hashResult);
+        byte[] secBytes = sec.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x08);
+        writeVarint(outer, 2);
+        outer.write(0x10);
+        writeVarint(outer, 200);
+        outer.write(0xC2); // field 40: secret ((40 << 3) | 2 = 322 = 0xC2, 0x02)
+        outer.write(0x02);
+        writeVarint(outer, secBytes.length);
+        outer.write(secBytes);
+
+        return outer.toByteArray();
+    }
+
+    private byte[] buildRemoteConfigureResponse() throws IOException {
+        ByteArrayOutputStream dev = new ByteArrayOutputStream();
+        dev.write(0x0A); // field 1: model
+        byte[] m = "HarvyRemote".getBytes(StandardCharsets.UTF_8);
+        writeVarint(dev, m.length);
+        dev.write(m);
+
+        dev.write(0x12); // field 2: vendor
+        byte[] v = "Google".getBytes(StandardCharsets.UTF_8);
+        writeVarint(dev, v.length);
+        dev.write(v);
+
+        dev.write(0x18); // field 3: unknown1 = 1
+        writeVarint(dev, 1);
+
+        dev.write(0x22); // field 4: unknown2 = "1"
+        byte[] u2 = "1".getBytes(StandardCharsets.UTF_8);
+        writeVarint(dev, u2.length);
+        dev.write(u2);
+
+        dev.write(0x2A); // field 5: package_name
+        byte[] pkg = "atvremote".getBytes(StandardCharsets.UTF_8);
+        writeVarint(dev, pkg.length);
+        dev.write(pkg);
+
+        dev.write(0x32); // field 6: app_version
+        byte[] ver = "1.0.0".getBytes(StandardCharsets.UTF_8);
+        writeVarint(dev, ver.length);
+        dev.write(ver);
+
+        byte[] devBytes = dev.toByteArray();
+
+        ByteArrayOutputStream cfg = new ByteArrayOutputStream();
+        cfg.write(0x08); // field 1: code1 = 622
+        writeVarint(cfg, 622);
+        cfg.write(0x12); // field 2: device_info
+        writeVarint(cfg, devBytes.length);
+        cfg.write(devBytes);
+
+        byte[] cfgBytes = cfg.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x0A); // field 1: remote_configure
+        writeVarint(outer, cfgBytes.length);
+        outer.write(cfgBytes);
+
+        return outer.toByteArray();
+    }
+
+    private byte[] buildRemoteSetActiveResponse() throws IOException {
+        ByteArrayOutputStream act = new ByteArrayOutputStream();
+        act.write(0x08); // field 1: active = 622
+        writeVarint(act, 622);
+        byte[] actBytes = act.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x12); // field 2: remote_set_active
+        writeVarint(outer, actBytes.length);
+        outer.write(actBytes);
+
+        return outer.toByteArray();
+    }
+
+    private byte[] buildRemoteKeyInjectMessage(int keycode, int direction) throws IOException {
+        ByteArrayOutputStream key = new ByteArrayOutputStream();
+        key.write(0x08); // field 1: key_code
+        writeVarint(key, keycode);
+        key.write(0x10); // field 2: direction (3 = SHORT)
+        writeVarint(key, direction);
+        byte[] keyBytes = key.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x52); // field 10: remote_key_inject ((10 << 3) | 2 = 82 = 0x52)
+        writeVarint(outer, keyBytes.length);
+        outer.write(keyBytes);
+
+        return outer.toByteArray();
+    }
+
+    // =========================================================================
+    // GENERAL TV DISCOVERY (SSDP + Subnet Sweep)
+    // =========================================================================
+
+    @JavascriptInterface
+    public void startScan() {
+        scanExecutor.submit(() -> {
+            discoveredIps.clear();
+            runSsdpDiscovery();
+            runSubnetSweep();
+        });
+    }
+
+    @JavascriptInterface
+    public String getDeviceSubnet() {
         try {
             ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             if (cm != null) {
                 Network activeNet = cm.getActiveNetwork();
                 if (activeNet != null) {
-                    LinkProperties lp = cm.getLinkProperties(activeNet);
-                    if (lp != null) {
-                        for (LinkAddress la : lp.getLinkAddresses()) {
-                            InetAddress addr = la.getAddress();
-                            if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
-                                String host = addr.getHostAddress();
-                                if (host != null && !host.startsWith("127.")) {
-                                    return host;
+                    NetworkCapabilities caps = cm.getNetworkCapabilities(activeNet);
+                    if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                        LinkProperties lp = cm.getLinkProperties(activeNet);
+                        if (lp != null) {
+                            for (LinkAddress addr : lp.getLinkAddresses()) {
+                                InetAddress inet = addr.getAddress();
+                                if (!inet.isLoopbackAddress() && inet.getAddress().length == 4) {
+                                    String ip = inet.getHostAddress();
+                                    if (ip != null && !ip.startsWith("127.")) {
+                                        int lastDot = ip.lastIndexOf('.');
+                                        if (lastDot > 0) {
+                                            return ip.substring(0, lastDot + 1);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -99,90 +691,40 @@ public class NativeTVManager {
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "ConnectivityManager IP resolution error", e);
+            Log.e(TAG, "Error determining subnet", e);
         }
+        return "192.168.1.";
+    }
 
+    private void runSubnetSweep() {
+        final String subnet = getDeviceSubnet();
+        String localIp = "";
         try {
-            List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
-            // 1. Look for Wi-Fi or Ethernet interfaces first (wlan0, eth0, etc.)
-            for (NetworkInterface intf : interfaces) {
-                String name = intf.getName().toLowerCase();
-                if (name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("en") || name.startsWith("wl")) {
-                    for (InetAddress addr : Collections.list(intf.getInetAddresses())) {
-                        if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
-                            String s = addr.getHostAddress();
-                            if (s != null && !s.startsWith("127.")) {
-                                return s;
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                Network activeNet = cm.getActiveNetwork();
+                if (activeNet != null) {
+                    LinkProperties lp = cm.getLinkProperties(activeNet);
+                    if (lp != null) {
+                        for (LinkAddress addr : lp.getLinkAddresses()) {
+                            InetAddress inet = addr.getAddress();
+                            if (!inet.isLoopbackAddress() && inet.getAddress().length == 4) {
+                                localIp = inet.getHostAddress();
+                                break;
                             }
                         }
                     }
                 }
             }
-            // 2. Fallback to private network IP
-            for (NetworkInterface intf : interfaces) {
-                for (InetAddress addr : Collections.list(intf.getInetAddresses())) {
-                    if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
-                        String s = addr.getHostAddress();
-                        if (s != null && (s.startsWith("192.168.") || s.startsWith("10.") || s.startsWith("172."))) {
-                            return s;
-                        }
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            Log.e(TAG, "NetworkInterface IP lookup failed", ex);
-        }
-
-        return "192.168.1.100";
-    }
-
-    @JavascriptInterface
-    public String getDeviceSubnet() {
-        String localIp = getLocalIpAddress();
-        int lastDot = localIp.lastIndexOf('.');
-        if (lastDot > 0) {
-            return localIp.substring(0, lastDot + 1);
-        }
-        return "192.168.1.";
-    }
-
-    /**
-     * Start high-speed Smart TV Auto-Discovery:
-     * 1. Acquires MulticastLock for SSDP
-     * 2. Broadcasts SSDP M-SEARCH (instant detection of Roku, Google TV / Cast, Samsung, LG)
-     * 3. Simultaneously runs multi-threaded port sweeps across the local subnet
-     */
-    @JavascriptInterface
-    public void startScan() {
-        if (scanExecutor != null && !scanExecutor.isShutdown()) {
-            scanExecutor.shutdownNow();
-        }
-        discoveredIps.clear();
-        scanExecutor = Executors.newFixedThreadPool(28);
-
-        final String localIp = getLocalIpAddress();
-        int lastDot = localIp.lastIndexOf('.');
-        final String subnet = (lastDot > 0) ? localIp.substring(0, lastDot + 1) : "192.168.1.";
-
-        try {
-            JSONObject startDetail = new JSONObject();
-            startDetail.put("subnet", subnet);
-            startDetail.put("localIp", localIp);
-            dispatchJSEvent("tv-scan-started", startDetail);
         } catch (Exception e) {
             // ignore
         }
 
-        // 1. Launch SSDP M-SEARCH discovery in background thread
-        scanExecutor.submit(() -> runSsdpDiscovery());
-
-        // 2. Sweep local subnet IP addresses (1..254)
         final AtomicInteger pendingTasks = new AtomicInteger(254);
         final AtomicInteger foundDevices = new AtomicInteger(0);
 
         for (int i = 1; i <= 254; i++) {
             final String targetIp = subnet + i;
-            // Skip the phone's own IP
             if (targetIp.equals(localIp)) {
                 if (pendingTasks.decrementAndGet() == 0) {
                     notifyScanFinished(foundDevices.get(), subnet);
@@ -216,10 +758,6 @@ public class NativeTVManager {
         }
     }
 
-    /**
-     * SSDP / UPnP Multicast Search (239.255.255.250:1900)
-     * Discovers Roku, DIAL (Google TV / Android TV), Samsung, and LG TVs instantly.
-     */
     private void runSsdpDiscovery() {
         DatagramSocket socket = null;
         try {
@@ -246,7 +784,6 @@ public class NativeTVManager {
                     "MAN: \"ssdp:discover\"\r\n" +
                     "MX: 2\r\n" +
                     "ST: ssdp:all\r\n\r\n";
-
             byte[] sendData = mSearch.getBytes(StandardCharsets.UTF_8);
             InetAddress group = InetAddress.getByName("239.255.255.250");
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, group, 1900);
@@ -284,7 +821,6 @@ public class NativeTVManager {
                         handleSsdpResponse(ip, resp);
                     }
                 } catch (Exception e) {
-                    // timeout or finished
                     break;
                 }
             }
@@ -310,14 +846,12 @@ public class NativeTVManager {
 
         if (lower.contains("roku") || lower.contains(":8060")) {
             probeRoku(ip);
-        } else if (lower.contains("dial") || lower.contains("google") || lower.contains("eureka") || lower.contains(":8008")) {
+        } else if (lower.contains("dial") || lower.contains("google") || lower.contains("eureka") || lower.contains(":8008") || lower.contains(":6467") || lower.contains(":6466")) {
             probeGoogleTV(ip, location);
         } else if (lower.contains("samsung") || lower.contains(":8001") || lower.contains(":8002")) {
             probeSamsung(ip);
-        } else if (lower.contains("webos") || lower.contains("lg") || lower.contains(":3000")) {
+        } else if (lower.contains("webos") || lower.contains("lg") || lower.contains(":3000") || lower.contains(":3001")) {
             probeLg(ip);
-        } else if (location != null && !location.isEmpty()) {
-            probeGenericXml(ip, location);
         }
     }
 
@@ -336,56 +870,53 @@ public class NativeTVManager {
         return null;
     }
 
-    /**
-     * Port sweep probe for an individual IP
-     */
     private void probeIpForTVs(String ip, AtomicInteger foundDevices) {
         if (discoveredIps.contains(ip)) return;
 
-        // 1. Probe Roku ECP (Port 8060)
-        if (isPortOpen(ip, 8060, 250)) {
-            probeRoku(ip);
-            return;
-        }
-
-        // 2. Probe Google TV / Android TV (Ports 8008, 6467, 6466, 8009)
-        boolean hasDial = isPortOpen(ip, 8008, 250);
-        boolean hasGtvRemote = isPortOpen(ip, 6467, 250) || isPortOpen(ip, 6466, 250);
+        // 1. Probe Google TV / Android TV (Ports 8008, 6466, 6467)
+        boolean hasDial = isPortOpen(ip, 8008, 400);
+        boolean hasGtvRemote = isPortOpen(ip, 6466, 400) || isPortOpen(ip, 6467, 400);
         if (hasDial || hasGtvRemote) {
             probeGoogleTV(ip, hasDial ? "http://" + ip + ":8008/ssdp/device-desc.xml" : null);
+            foundDevices.incrementAndGet();
             return;
         }
 
-        // 3. Probe Samsung Smart TV (Port 8001, 8002)
-        if (isPortOpen(ip, 8001, 250) || isPortOpen(ip, 8002, 250)) {
+        // 2. Probe Roku ECP (Port 8060)
+        if (isPortOpen(ip, 8060, 400)) {
+            probeRoku(ip);
+            foundDevices.incrementAndGet();
+            return;
+        }
+
+        // 3. Probe Samsung Smart TV (Port 8002, 8001)
+        if (isPortOpen(ip, 8002, 400) || isPortOpen(ip, 8001, 400)) {
             probeSamsung(ip);
+            foundDevices.incrementAndGet();
             return;
         }
 
-        // 4. Probe LG webOS (Port 3000, 3001)
-        if (isPortOpen(ip, 3000, 250) || isPortOpen(ip, 3001, 250)) {
+        // 4. Probe LG webOS (Port 3001, 3000)
+        if (isPortOpen(ip, 3001, 400) || isPortOpen(ip, 3000, 400)) {
             probeLg(ip);
+            foundDevices.incrementAndGet();
             return;
         }
 
-        // 5. Probe Amazon Fire TV / Android ADB (Port 5555)
-        if (isPortOpen(ip, 5555, 250)) {
-            registerFoundTV("firetv-" + ip.replace('.', '-'), "Amazon Fire TV (" + ip + ")", "fire_tv", ip, 5555, "Fire OS");
-            return;
-        }
-
-        // 6. Probe Vizio SmartCast (Port 7345)
-        if (isPortOpen(ip, 7345, 250)) {
-            registerFoundTV("vizio-" + ip.replace('.', '-'), "Vizio SmartCast (" + ip + ")", "vizio", ip, 7345, "SmartCast");
-            return;
-        }
-
-        // 7. Probe Sony Bravia Google TV IP Control (Port 80, 20060)
-        if (isPortOpen(ip, 80, 250)) {
+        // 5. Probe Sony Bravia Google TV (Port 80, 20060)
+        if (isPortOpen(ip, 80, 300) || isPortOpen(ip, 20060, 300)) {
             String sonyTest = httpGet("http://" + ip + "/sony/ircc", 800);
-            if (sonyTest != null || isPortOpen(ip, 20060, 250)) {
-                registerFoundTV("sony-gtv-" + ip.replace('.', '-'), "Sony BRAVIA Google TV (" + ip + ")", "google_tv", ip, 6467, "Sony BRAVIA (Android TV)");
+            if (sonyTest != null) {
+                registerFoundTV("sony-gtv-" + ip.replace('.', '-'), "Sony BRAVIA Google TV (" + ip + ")", "google_tv", ip, 6466, "Sony BRAVIA");
+                foundDevices.incrementAndGet();
+                return;
             }
+        }
+
+        // 6. Probe Fire TV / ADB (Port 5555)
+        if (isPortOpen(ip, 5555, 300)) {
+            registerFoundTV("firetv-" + ip.replace('.', '-'), "Amazon Fire TV (" + ip + ")", "fire_tv", ip, 5555, "Fire OS");
+            foundDevices.incrementAndGet();
         }
     }
 
@@ -413,28 +944,28 @@ public class NativeTVManager {
         String name = "Google TV (" + ip + ")";
         String model = "Google TV / Android TV";
         try {
-            String targetUrl = (location != null && !location.isEmpty()) ? location : "http://" + ip + ":8008/ssdp/device-desc.xml";
-            String xml = httpGet(targetUrl, 1500);
-            if (xml != null) {
-                String fn = extractXmlTag(xml, "friendlyName");
-                if (fn != null && !fn.isEmpty()) name = fn;
-                String mn = extractXmlTag(xml, "modelName");
-                if (mn != null && !mn.isEmpty()) model = mn;
+            String eureka = httpGet("http://" + ip + ":8008/setup/eureka_info", 1200);
+            if (eureka != null) {
+                JSONObject obj = new JSONObject(eureka);
+                String n = obj.optString("name");
+                if (n != null && !n.isEmpty()) name = n;
+                String m = obj.optString("build_version");
+                if (m != null && !m.isEmpty()) model = "Google Cast " + m;
             } else {
-                // Try eureka info
-                String eureka = httpGet("http://" + ip + ":8008/setup/eureka_info", 1500);
-                if (eureka != null) {
-                    JSONObject obj = new JSONObject(eureka);
-                    String n = obj.optString("name");
-                    if (n != null && !n.isEmpty()) name = n;
-                    String m = obj.optString("build_version");
-                    if (m != null && !m.isEmpty()) model = "Google Cast " + m;
+                String targetUrl = (location != null && !location.isEmpty()) ? location : "http://" + ip + ":8008/ssdp/device-desc.xml";
+                String xml = httpGet(targetUrl, 1200);
+                if (xml != null) {
+                    String fn = extractXmlTag(xml, "friendlyName");
+                    if (fn != null && !fn.isEmpty()) name = fn;
+                    String mn = extractXmlTag(xml, "modelName");
+                    if (mn != null && !mn.isEmpty()) model = mn;
                 }
             }
         } catch (Exception e) {
             // fallback
         }
-        registerFoundTV("googletv-" + ip.replace('.', '-'), name, "google_tv", ip, 6467, model);
+        // Port 6466 is the Google TV Remote v2 Command Port
+        registerFoundTV("googletv-" + ip.replace('.', '-'), name, "google_tv", ip, 6466, model);
     }
 
     private void probeSamsung(String ip) {
@@ -461,29 +992,7 @@ public class NativeTVManager {
 
     private void probeLg(String ip) {
         if (!discoveredIps.add(ip)) return;
-        registerFoundTV("lg-" + ip.replace('.', '-'), "LG webOS Smart TV (" + ip + ")", "lg_webos", ip, 3001, "LG webOS");
-    }
-
-    private void probeGenericXml(String ip, String location) {
-        if (!discoveredIps.add(ip)) return;
-        try {
-            String xml = httpGet(location, 1500);
-            if (xml != null) {
-                String fn = extractXmlTag(xml, "friendlyName");
-                String mn = extractXmlTag(xml, "modelName");
-                String name = (fn != null && !fn.isEmpty()) ? fn : "Smart TV (" + ip + ")";
-                String model = (mn != null && !mn.isEmpty()) ? mn : "Universal TV";
-                String brand = "universal";
-                if (name.toLowerCase().contains("google") || name.toLowerCase().contains("chromecast")) brand = "google_tv";
-                else if (name.toLowerCase().contains("roku")) brand = "roku";
-                else if (name.toLowerCase().contains("samsung")) brand = "samsung";
-                else if (name.toLowerCase().contains("lg")) brand = "lg_webos";
-
-                registerFoundTV("tv-" + ip.replace('.', '-'), name, brand, ip, 8008, model);
-            }
-        } catch (Exception e) {
-            // fallback
-        }
+        registerFoundTV("lg-" + ip.replace('.', '-'), "LG Smart TV (" + ip + ")", "lg_webos", ip, 3001, "webOS TV");
     }
 
     private void registerFoundTV(String id, String name, String brand, String ip, int port, String model) {
@@ -495,8 +1004,8 @@ public class NativeTVManager {
             dev.put("ip", ip);
             dev.put("port", port);
             dev.put("model", model);
+            dev.put("isPaired", !"google_tv".equalsIgnoreCase(brand));
             dev.put("isConnected", false);
-            dev.put("isPaired", true);
             dev.put("lastPingMs", 18);
             dispatchJSEvent("tv-discovered", dev);
             Log.d(TAG, "Discovered Smart TV: " + name + " [" + brand + "] at " + ip);
@@ -505,9 +1014,10 @@ public class NativeTVManager {
         }
     }
 
-    /**
-     * Dispatch remote control actions directly to the physical Smart TV.
-     */
+    // =========================================================================
+    // REMOTE KEY DISPATCH (All Smart TV Brands)
+    // =========================================================================
+
     @JavascriptInterface
     public void sendAction(String brand, String ip, int port, String action) {
         commandExecutor.submit(() -> {
@@ -516,25 +1026,17 @@ public class NativeTVManager {
             String protocolInfo = "";
 
             try {
-                if ("roku".equalsIgnoreCase(brand)) {
-                    // Roku External Control Protocol (ECP) over HTTP POST
-                    String key = mapRokuKey(action);
-                    String url = "http://" + ip + ":8060/keypress/" + key;
-                    success = httpPost(url, null, 2000);
-                    protocolInfo = "Roku ECP (POST /keypress/" + key + ")";
-                } else if ("google_tv".equalsIgnoreCase(brand) || "android_tv".equalsIgnoreCase(brand)) {
+                if ("google_tv".equalsIgnoreCase(brand) || "android_tv".equalsIgnoreCase(brand)) {
                     int androidKeycode = mapAndroidKeycode(action);
 
-                    // 1. Try Android TV Remote v2 (TLS on Port 6467)
-                    if (isPortOpen(ip, 6467, 350)) {
-                        success = sendGoogleTvRemoteV2Key(ip, 6467, androidKeycode);
-                        if (success) {
-                            protocolInfo = "Android TV Remote v2 (TLS 6467 key " + androidKeycode + ")";
-                        }
+                    // 1. Google TV Remote v2 (TLS Port 6466)
+                    success = sendGoogleTvKey(ip, androidKeycode);
+                    if (success) {
+                        protocolInfo = "Google TV Remote v2 (Key " + androidKeycode + ")";
                     }
 
-                    // 2. If not succeeded, try Sony Bravia IRCC REST API (works on Sony Google TVs without pairing)
-                    if (!success && (isPortOpen(ip, 80, 300) || isPortOpen(ip, 20060, 300))) {
+                    // 2. If not succeeded, check if Sony Bravia IRCC is available
+                    if (!success && (isPortOpen(ip, 80, 200) || isPortOpen(ip, 20060, 200))) {
                         String irccCode = mapSonyIrcc(action);
                         if (irccCode != null) {
                             success = sendSonyIrcc(ip, irccCode);
@@ -544,60 +1046,68 @@ public class NativeTVManager {
                         }
                     }
 
-                    // 3. If ADB Wi-Fi port 5555 is open (developer options)
-                    if (!success && isPortOpen(ip, 5555, 300)) {
+                    // 3. If ADB Wi-Fi port 5555 is enabled
+                    if (!success && isPortOpen(ip, 5555, 200)) {
                         success = sendAdbKey(ip, 5555, androidKeycode);
                         if (success) {
-                            protocolInfo = "Android TV ADB (Port 5555 key " + androidKeycode + ")";
+                            protocolInfo = "Android TV ADB (key " + androidKeycode + ")";
                         }
                     }
 
                     // 4. Power Wake-on-LAN fallback
-                    if ("POWER".equalsIgnoreCase(action)) {
+                    if (!success && "POWER".equalsIgnoreCase(action)) {
                         sendWakeOnLan(ip);
                         success = true;
-                        protocolInfo = "Wake-on-LAN + Google TV Power";
+                        protocolInfo = "Wake-on-LAN Power Packet";
                     }
 
+                    // If still failed, notify UI that this Google TV needs pairing
                     if (!success) {
-                        // Test TCP reachability
-                        success = isPortOpen(ip, port > 0 ? port : 6467, 600);
-                        protocolInfo = "Google TV Connected (" + ip + ":" + port + ")";
+                        JSONObject req = new JSONObject();
+                        req.put("ip", ip);
+                        req.put("brand", "google_tv");
+                        req.put("message", "This TV requires pairing. Enter the code shown on your TV screen.");
+                        dispatchJSEvent("tv-needs-pairing", req);
+                        // Trigger pairing in background so code pops up immediately on TV screen
+                        startPairing(ip);
+                        protocolInfo = "Google TV (Pairing Required)";
                     }
+                } else if ("roku".equalsIgnoreCase(brand)) {
+                    String key = mapRokuKey(action);
+                    String url = "http://" + ip + ":8060/keypress/" + key;
+                    success = httpPost(url, null, 1500);
+                    protocolInfo = "Roku ECP (POST /keypress/" + key + ")";
                 } else if ("samsung".equalsIgnoreCase(brand)) {
-                    // Samsung Tizen WebSocket
                     String samsungKey = mapSamsungKey(action);
                     success = sendSamsungWebSocketKey(ip, port > 0 ? port : 8002, samsungKey);
                     protocolInfo = "Samsung SmartView WS (" + samsungKey + ")";
                 } else if ("lg_webos".equalsIgnoreCase(brand)) {
-                    // LG webOS WebSocket
                     String lgKey = mapLgUri(action);
                     success = sendLgWebSocketKey(ip, port > 0 ? port : 3001, lgKey);
                     protocolInfo = "LG webOS SSAP (" + action + ")";
                 } else if ("fire_tv".equalsIgnoreCase(brand)) {
                     int androidKeycode = mapAndroidKeycode(action);
-                    if (isPortOpen(ip, 5555, 350)) {
+                    if (isPortOpen(ip, 5555, 300)) {
                         success = sendAdbKey(ip, 5555, androidKeycode);
                         protocolInfo = "Fire TV ADB (key " + androidKeycode + ")";
                     } else {
-                        success = isPortOpen(ip, 8008, 400);
-                        protocolInfo = "Fire TV Network (" + ip + ")";
+                        success = httpPost("http://" + ip + ":8008/apps/YouTube", null, 1500);
+                        protocolInfo = "Fire TV DIAL (" + ip + ")";
                     }
                 } else {
-                    // Universal fallback
                     if ("POWER".equalsIgnoreCase(action)) {
                         sendWakeOnLan(ip);
                     }
-                    success = isPortOpen(ip, port > 0 ? port : 8008, 800);
+                    success = isPortOpen(ip, port > 0 ? port : 8008, 500);
                     protocolInfo = "Universal Smart TV (" + action + ")";
                 }
             } catch (Exception e) {
-                Log.e(TAG, "sendAction failed for " + brand + " at " + ip, e);
+                Log.e(TAG, "sendAction error for " + brand + " at " + ip, e);
                 success = false;
                 protocolInfo = "Error: " + e.getMessage();
             }
 
-            long latency = Math.max(12, System.currentTimeMillis() - startTime);
+            long latency = Math.max(8, System.currentTimeMillis() - startTime);
 
             try {
                 JSONObject res = new JSONObject();
@@ -614,122 +1124,31 @@ public class NativeTVManager {
         });
     }
 
-    /**
-     * Android TV Remote v2 Protocol Key Frame Transmission
-     * Uses SSLSocket on port 6467 with Protobuf framing.
-     */
-    private boolean sendGoogleTvRemoteV2Key(String ip, int port, int keycode) {
-        SSLSocket sslSocket = null;
-        try {
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                    new X509TrustManager() {
-                        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                        public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                        public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                    }
-            };
+    // =========================================================================
+    // SAMSUNG & LG WEBSOCKET CLIENTS
+    // =========================================================================
 
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, trustAllCerts, new SecureRandom());
-            sslSocket = (SSLSocket) sc.getSocketFactory().createSocket();
-            sslSocket.setSoTimeout(1500);
-            sslSocket.connect(new InetSocketAddress(ip, port), 1200);
-            sslSocket.startHandshake();
-
-            OutputStream os = sslSocket.getOutputStream();
-
-            // Build protobuf message for Android TV Remote v2:
-            // RemoteKeyInject message:
-            // Submessage (RemoteKeyInject):
-            //   tag 1 (key_code): varint keycode
-            //   tag 2 (direction): 3 (SHORT)
-            // Outer message:
-            //   tag 2 (remote_key_inject): length-delimited submessage
-            ByteArrayOutputStream sub = new ByteArrayOutputStream();
-            // tag 1, wire type 0 (varint): (1 << 3) | 0 = 8
-            sub.write(0x08);
-            writeVarint(sub, keycode);
-            // tag 2, wire type 0 (varint): (2 << 3) | 0 = 16
-            sub.write(0x10);
-            sub.write(0x03); // SHORT direction
-            byte[] subBytes = sub.toByteArray();
-
-            ByteArrayOutputStream outer = new ByteArrayOutputStream();
-            // tag 2, wire type 2 (length delimited): (2 << 3) | 2 = 18 (0x12)
-            outer.write(0x12);
-            writeVarint(outer, subBytes.length);
-            outer.write(subBytes);
-            byte[] outerBytes = outer.toByteArray();
-
-            // Android TV Remote v2 frames are prefixed with their length as varint
-            ByteArrayOutputStream frame = new ByteArrayOutputStream();
-            writeVarint(frame, outerBytes.length);
-            frame.write(outerBytes);
-
-            os.write(frame.toByteArray());
-            os.flush();
-            return true;
-        } catch (Exception e) {
-            Log.w(TAG, "Google TV Remote v2 transmission note: " + e.getMessage());
-            return false;
-        } finally {
-            if (sslSocket != null) {
-                try { sslSocket.close(); } catch (Exception e) { /* ignore */ }
-            }
-        }
-    }
-
-    private void writeVarint(ByteArrayOutputStream out, int value) {
-        while ((value & 0xFFFFFF80) != 0) {
-            out.write((value & 0x7F) | 0x80);
-            value >>>= 7;
-        }
-        out.write(value & 0x7F);
-    }
-
-    /**
-     * Sony Bravia IRCC IP Control (XML SOAP POST over Port 80)
-     * Direct control supported on all Sony Android / Google TVs out of the box.
-     */
-    private boolean sendSonyIrcc(String ip, String irccCode) {
-        try {
-            String xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                    "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n" +
-                    "  <s:Body>\n" +
-                    "    <u:X_SendIRCC xmlns:u=\"urn:schemas-sony-com:service:IRCC:1\">\n" +
-                    "      <IRCCCode>" + irccCode + "</IRCCCode>\n" +
-                    "    </u:X_SendIRCC>\n" +
-                    "  </s:Body>\n" +
-                    "</s:Envelope>";
-
-            URL url = new URL("http://" + ip + "/sony/ircc");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setConnectTimeout(1200);
-            conn.setReadTimeout(1200);
-            conn.setRequestProperty("Content-Type", "text/xml; charset=UTF-8");
-            conn.setRequestProperty("SOAPACTION", "\"urn:schemas-sony-com:service:IRCC:1#X_SendIRCC\"");
-            conn.setRequestProperty("X-Auth-PSK", "0000");
-            conn.setDoOutput(true);
-
-            byte[] b = xml.getBytes(StandardCharsets.UTF_8);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(b);
-            }
-            int code = conn.getResponseCode();
-            return code >= 200 && code < 400;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Samsung Smart TV WebSocket Key Client (Ports 8001 / 8002)
-     */
     private boolean sendSamsungWebSocketKey(String ip, int port, String samsungKey) {
+        if (port == 8002) {
+            if (sendSamsungWsInternal(ip, 8002, true, samsungKey)) return true;
+        }
+        if (sendSamsungWsInternal(ip, port > 0 ? port : 8001, false, samsungKey)) return true;
+        return sendSamsungWsInternal(ip, 8001, false, samsungKey);
+    }
+
+    private boolean sendSamsungWsInternal(String ip, int port, boolean useSsl, String samsungKey) {
         Socket socket = null;
         try {
-            socket = new Socket();
+            if (useSsl) {
+                SSLContext sc = initGtvSslContext();
+                if (sc != null) {
+                    socket = sc.getSocketFactory().createSocket();
+                } else {
+                    socket = new Socket();
+                }
+            } else {
+                socket = new Socket();
+            }
             socket.setSoTimeout(1500);
             socket.connect(new InetSocketAddress(ip, port), 1200);
 
@@ -747,18 +1166,15 @@ public class NativeTVManager {
             os.write(wsHandshake.getBytes(StandardCharsets.UTF_8));
             os.flush();
 
-            // Read handshake response
             byte[] buf = new byte[1024];
             int read = is.read(buf);
             String resp = new String(buf, 0, Math.max(0, read), StandardCharsets.UTF_8);
             if (resp.contains("101")) {
-                // Connected, send remote key frame
                 String payload = "{\"method\":\"ms.remote.control\",\"params\":{\"Cmd\":\"Click\",\"DataOfCmd\":\"" + samsungKey + "\",\"Option\":\"false\",\"TypeOfRemote\":\"SendRemoteKey\"}}";
                 byte[] payloadBytes = payload.getBytes(StandardCharsets.UTF_8);
 
                 ByteArrayOutputStream frame = new ByteArrayOutputStream();
-                frame.write(0x81); // FIN + Text opcode
-                // Client must mask frames
+                frame.write(0x81);
                 byte[] mask = new byte[]{0x12, 0x34, 0x56, 0x78};
                 if (payloadBytes.length <= 125) {
                     frame.write(0x80 | payloadBytes.length);
@@ -782,14 +1198,11 @@ public class NativeTVManager {
             return false;
         } finally {
             if (socket != null) {
-                try { socket.close(); } catch (Exception e) { /* ignore */ }
+                try { socket.close(); } catch (Exception e) {}
             }
         }
     }
 
-    /**
-     * LG webOS SSAP WebSocket Client (Port 3000 / 3001)
-     */
     private boolean sendLgWebSocketKey(String ip, int port, String uri) {
         Socket socket = null;
         try {
@@ -836,7 +1249,7 @@ public class NativeTVManager {
             return false;
         } finally {
             if (socket != null) {
-                try { socket.close(); } catch (Exception e) { /* ignore */ }
+                try { socket.close(); } catch (Exception e) {}
             }
         }
     }
@@ -854,17 +1267,12 @@ public class NativeTVManager {
         }
     }
 
-    /**
-     * Wake-on-LAN: Broadcast Magic Packet over UDP 9 to power on sleeping TV
-     */
     private void sendWakeOnLan(String ip) {
         try (DatagramSocket socket = new DatagramSocket()) {
-            socket.setBroadcast(true);
             byte[] bytes = new byte[102];
             for (int i = 0; i < 6; i++) {
                 bytes[i] = (byte) 0xFF;
             }
-            // If target IP known, build broadcast
             for (int i = 6; i < bytes.length; i++) {
                 bytes[i] = (byte) 0xFF;
             }
@@ -875,16 +1283,13 @@ public class NativeTVManager {
         }
     }
 
-    /**
-     * Launch streaming application on Smart TV
-     */
     @JavascriptInterface
     public void launchApp(String brand, String ip, int port, String appSlug) {
         commandExecutor.submit(() -> {
             boolean success = false;
             try {
                 if ("roku".equalsIgnoreCase(brand)) {
-                    String appId = "12"; // default YouTube
+                    String appId = "12";
                     if ("netflix".equalsIgnoreCase(appSlug)) appId = "12";
                     else if ("prime".equalsIgnoreCase(appSlug)) appId = "13";
                     else if ("disney".equalsIgnoreCase(appSlug)) appId = "291097";
@@ -900,7 +1305,7 @@ public class NativeTVManager {
 
                     success = httpPost("http://" + ip + ":8008/apps/" + dialApp, null, 2500);
                 } else if ("samsung".equalsIgnoreCase(brand)) {
-                    String appId = "111299001912"; // YouTube on Tizen
+                    String appId = "111299001912";
                     if ("netflix".equalsIgnoreCase(appSlug)) appId = "3201512006785";
                     success = httpPost("http://" + ip + ":8001/api/v2/applications/" + appId, null, 2500);
                 }
@@ -919,16 +1324,13 @@ public class NativeTVManager {
         });
     }
 
-    /**
-     * Ping TV IP to check connectivity and measure latency
-     */
     @JavascriptInterface
     public void pingDevice(String ip, int port) {
         commandExecutor.submit(() -> {
             long start = System.currentTimeMillis();
-            boolean open = isPortOpen(ip, port > 0 ? port : 8060, 1200);
+            boolean open = isPortOpen(ip, port > 0 ? port : 6466, 1200);
             if (!open) {
-                open = isPortOpen(ip, 8008, 1000) || isPortOpen(ip, 8001, 1000) || isPortOpen(ip, 3000, 1000);
+                open = isPortOpen(ip, 6467, 1000) || isPortOpen(ip, 8008, 1000) || isPortOpen(ip, 8060, 1000) || isPortOpen(ip, 8002, 1000) || isPortOpen(ip, 3001, 1000);
             }
             long latency = System.currentTimeMillis() - start;
 
@@ -945,9 +1347,6 @@ public class NativeTVManager {
         });
     }
 
-    /**
-     * Send text to TV active input field
-     */
     @JavascriptInterface
     public void sendTextInput(String brand, String ip, int port, String text) {
         commandExecutor.submit(() -> {
@@ -971,6 +1370,10 @@ public class NativeTVManager {
             }
         });
     }
+
+    // =========================================================================
+    // NETWORK UTILITIES
+    // =========================================================================
 
     private boolean isPortOpen(String ip, int port, int timeoutMs) {
         try (Socket socket = new Socket()) {
@@ -1016,19 +1419,26 @@ public class NativeTVManager {
             conn.setRequestProperty("User-Agent", "HarvyRemote/1.0");
 
             if (jsonPayload != null && !jsonPayload.isEmpty()) {
+                byte[] data = jsonPayload.getBytes(StandardCharsets.UTF_8);
                 conn.setRequestProperty("Content-Type", "application/json");
+                conn.setFixedLengthStreamingMode(data.length);
                 conn.setDoOutput(true);
                 try (OutputStream os = conn.getOutputStream()) {
-                    os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
+                    os.write(data);
+                    os.flush();
                 }
             } else {
                 conn.setFixedLengthStreamingMode(0);
                 conn.setDoOutput(true);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.flush();
+                }
             }
 
             int code = conn.getResponseCode();
             return code >= 200 && code < 400;
         } catch (Exception e) {
+            Log.w(TAG, "httpPost error for " + urlStr + ": " + e.getMessage());
             return false;
         }
     }
@@ -1048,6 +1458,25 @@ public class NativeTVManager {
             // ignore
         }
         return null;
+    }
+
+    private int mapAndroidKeycode(String action) {
+        switch (action) {
+            case "DPAD_UP": return 19;
+            case "DPAD_DOWN": return 20;
+            case "DPAD_LEFT": return 21;
+            case "DPAD_RIGHT": return 22;
+            case "SELECT": return 23;
+            case "BACK": return 4;
+            case "HOME": return 3;
+            case "POWER": return 26;
+            case "VOLUME_UP": return 24;
+            case "VOLUME_DOWN": return 25;
+            case "MUTE": return 164;
+            case "TV_INPUT": return 178;
+            case "PLAY_PAUSE": return 85;
+            default: return 23;
+        }
     }
 
     private String mapRokuKey(String action) {
@@ -1083,6 +1512,7 @@ public class NativeTVManager {
             case "VOLUME_DOWN": return "KEY_VOLDOWN";
             case "MUTE": return "KEY_MUTE";
             case "TV_INPUT": return "KEY_SOURCE";
+            case "PLAY_PAUSE": return "KEY_PLAY";
             default: return "KEY_ENTER";
         }
     }
@@ -1101,7 +1531,30 @@ public class NativeTVManager {
             case "VOLUME_DOWN": return "ssap://audio/volumeDown";
             case "MUTE": return "ssap://audio/setMute";
             case "TV_INPUT": return "ssap://tv/switchInput";
+            case "PLAY_PAUSE": return "ssap://media.controls/play";
             default: return "ssap://media.controls/ok";
+        }
+    }
+
+    private boolean sendSonyIrcc(String ip, String irccCode) {
+        String soapXml = "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:X_SendIRCC xmlns:u=\"urn:schemas-sony-com:service:IRCC:1\"><IRCCCode>" + irccCode + "</IRCCCode></u:X_SendIRCC></s:Body></s:Envelope>";
+        try {
+            URL url = new URL("http://" + ip + "/sony/ircc");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(1500);
+            conn.setReadTimeout(1500);
+            conn.setRequestProperty("SOAPACTION", "\"urn:schemas-sony-com:service:IRCC:1#X_SendIRCC\"");
+            conn.setRequestProperty("X-Auth-PSK", "0000");
+            conn.setRequestProperty("Content-Type", "text/xml; charset=UTF-8");
+            conn.setDoOutput(true);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(soapXml.getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+            return conn.getResponseCode() == 200;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -1119,27 +1572,7 @@ public class NativeTVManager {
             case "VOLUME_DOWN": return "AAAAAQAAAAEAAAATAw==";
             case "MUTE": return "AAAAAQAAAAEAAAAUAw==";
             case "TV_INPUT": return "AAAAAQAAAAEAAAAlAw==";
-            case "PLAY_PAUSE": return "AAAAAgAAAJcAAAAaAw==";
             default: return null;
-        }
-    }
-
-    private int mapAndroidKeycode(String action) {
-        switch (action) {
-            case "DPAD_UP": return 19;
-            case "DPAD_DOWN": return 20;
-            case "DPAD_LEFT": return 21;
-            case "DPAD_RIGHT": return 22;
-            case "SELECT": return 23;
-            case "BACK": return 4;
-            case "HOME": return 3;
-            case "POWER": return 26;
-            case "VOLUME_UP": return 24;
-            case "VOLUME_DOWN": return 25;
-            case "MUTE": return 164;
-            case "TV_INPUT": return 178;
-            case "PLAY_PAUSE": return 85;
-            default: return 23;
         }
     }
 }

@@ -234,6 +234,9 @@ class UniversalTVClient {
   private discoveryListeners: ((device: SmartTVDevice) => void)[] = [];
   private scanFinishListeners: ((count: number, subnet: string) => void)[] = [];
   private pingListeners: ((ip: string, isConnected: boolean, latencyMs: number) => void)[] = [];
+  private pairingCodeListeners: ((detail: { ip: string; status: string }) => void)[] = [];
+  private pairStatusListeners: ((detail: { success: boolean; ip: string; message: string }) => void)[] = [];
+  private needsPairingListeners: ((detail: { ip: string; brand: string; message: string }) => void)[] = [];
 
   constructor() {
     try {
@@ -279,6 +282,24 @@ class UniversalTVClient {
             latencyMs || 22,
             success ? 'ack' : 'failed'
           );
+        }
+      }) as EventListener);
+
+      window.addEventListener('tv-pairing-code-requested', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          this.pairingCodeListeners.forEach((fn) => fn(e.detail));
+        }
+      }) as EventListener);
+
+      window.addEventListener('tv-pair-status', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          this.pairStatusListeners.forEach((fn) => fn(e.detail));
+        }
+      }) as EventListener);
+
+      window.addEventListener('tv-needs-pairing', ((e: CustomEvent<any>) => {
+        if (e.detail) {
+          this.needsPairingListeners.forEach((fn) => fn(e.detail));
         }
       }) as EventListener);
     }
@@ -337,6 +358,41 @@ class UniversalTVClient {
     if (bridge && typeof bridge.pingDevice === 'function') {
       bridge.pingDevice(ip, port);
     }
+  }
+
+  public startPairing(ip: string) {
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.startPairing === 'function') {
+      bridge.startPairing(ip);
+    }
+  }
+
+  public submitPairingPin(ip: string, pin: string) {
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.submitPairingPin === 'function') {
+      bridge.submitPairingPin(ip, pin);
+    }
+  }
+
+  public onPairingCodeRequested(callback: (detail: { ip: string; status: string }) => void) {
+    this.pairingCodeListeners.push(callback);
+    return () => {
+      this.pairingCodeListeners = this.pairingCodeListeners.filter((fn) => fn !== callback);
+    };
+  }
+
+  public onPairStatus(callback: (detail: { success: boolean; ip: string; message: string }) => void) {
+    this.pairStatusListeners.push(callback);
+    return () => {
+      this.pairStatusListeners = this.pairStatusListeners.filter((fn) => fn !== callback);
+    };
+  }
+
+  public onNeedsPairing(callback: (detail: { ip: string; brand: string; message: string }) => void) {
+    this.needsPairingListeners.push(callback);
+    return () => {
+      this.needsPairingListeners = this.needsPairingListeners.filter((fn) => fn !== callback);
+    };
   }
 
   private emitLog(

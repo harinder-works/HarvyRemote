@@ -66,6 +66,8 @@ export function DeviceManagerModal({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showPairDialog, setShowPairDialog] = useState<SmartTVDevice | null>(null);
   const [pairingPin, setPairingPin] = useState('');
+  const [pairingState, setPairingState] = useState<'idle' | 'starting' | 'waiting_code' | 'verifying' | 'success' | 'error'>('idle');
+  const [pairingError, setPairingError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'devices' | 'telemetry'>('devices');
 
   const [newDeviceName, setNewDeviceName] = useState('');
@@ -129,12 +131,62 @@ export function DeviceManagerModal({
       );
     });
 
+    const unsubPairCode = universalTV.onPairingCodeRequested(({ ip }) => {
+      setPairingState('waiting_code');
+      setPairingError(null);
+      // Auto-open pairing modal if not already open
+      setShowPairDialog((current) => {
+        if (current && current.ip === ip) return current;
+        const target = deviceList.find((d) => d.ip === ip) || {
+          id: `tv-${ip.replace(/\./g, '-')}`,
+          name: 'Google TV',
+          brand: 'google_tv',
+          ip,
+          port: 6467,
+          isPaired: false,
+          isConnected: false,
+        };
+        return target;
+      });
+    });
+
+    const unsubPairStatus = universalTV.onPairStatus(({ success, ip, message }) => {
+      if (success) {
+        setPairingState('success');
+        setPairingError(null);
+        sound.playAssistantChime();
+        setDeviceList((prev) => {
+          const updated = prev.map((d) =>
+            d.ip === ip ? { ...d, isPaired: true, isConnected: true } : d
+          );
+          saveDevices(updated);
+          const target = updated.find((d) => d.ip === ip) || null;
+          if (target) {
+            onDeviceChange(target);
+            universalTV.setActiveDevice(target);
+          }
+          return updated;
+        });
+        setTimeout(() => {
+          setShowPairDialog(null);
+          setPairingState('idle');
+          setPairingPin('');
+        }, 1200);
+      } else {
+        setPairingState('error');
+        setPairingError(message || 'Pairing rejected. Please check code.');
+        sound.playClick('soft');
+      }
+    });
+
     return () => {
       unsubDiscovered();
       unsubFinished();
       unsubPing();
+      unsubPairCode();
+      unsubPairStatus();
     };
-  }, [activeDevice, onDeviceChange]);
+  }, [activeDevice, deviceList, onDeviceChange]);
 
   // Update default port when brand changes in manual add form
   useEffect(() => {
@@ -161,18 +213,25 @@ export function DeviceManagerModal({
     }, 6000);
   };
 
+  const triggerPairing = (dev: SmartTVDevice) => {
+    setShowPairDialog(dev);
+    setPairingPin('');
+    setPairingState('starting');
+    setPairingError(null);
+    universalTV.startPairing(dev.ip);
+  };
+
   const handleConnectDevice = (dev: SmartTVDevice) => {
     sound.playClick('action');
-    if (!dev.isPaired && TV_BRAND_CONFIG[dev.brand].pairingType === 'pin') {
-      setShowPairDialog(dev);
-      setPairingPin('');
+    if (!dev.isPaired && TV_BRAND_CONFIG[dev.brand]?.pairingType === 'pin') {
+      triggerPairing(dev);
       return;
     }
 
     const updated = deviceList.map((d) => ({
       ...d,
       isConnected: d.id === dev.id,
-      isPaired: true,
+      isPaired: d.id === dev.id ? true : d.isPaired,
     }));
     saveDevices(updated);
     const target = updated.find((d) => d.id === dev.id) || null;
@@ -206,19 +265,16 @@ export function DeviceManagerModal({
   const handlePairSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!showPairDialog) return;
+    const cleanPin = pairingPin.trim().toUpperCase();
+    if (cleanPin.length !== 6) {
+      setPairingError('Enter the 6-character code shown on your TV screen');
+      return;
+    }
 
     sound.playClick('action');
-    const updated = deviceList.map((d) =>
-      d.id === showPairDialog.id
-        ? { ...d, isPaired: true, isConnected: true }
-        : { ...d, isConnected: false }
-    );
-    saveDevices(updated);
-    const target = updated.find((d) => d.id === showPairDialog.id) || null;
-    onDeviceChange(target);
-    universalTV.setActiveDevice(target);
-    setShowPairDialog(null);
-    setPairingPin('');
+    setPairingState('verifying');
+    setPairingError(null);
+    universalTV.submitPairingPin(showPairDialog.ip, cleanPin);
   };
 
   const handleAddDeviceSubmit = (e: React.FormEvent) => {
@@ -228,6 +284,7 @@ export function DeviceManagerModal({
 
     const brandConfig = TV_BRAND_CONFIG[newDeviceBrand];
     const parsedPort = parseInt(newDevicePort, 10) || brandConfig.defaultPort;
+    const requiresPinPairing = brandConfig.pairingType === 'pin';
 
     const newDev: SmartTVDevice = {
       id: `tv-${cleanIp.replace(/\./g, '-')}`,
@@ -236,23 +293,26 @@ export function DeviceManagerModal({
       ip: cleanIp,
       port: parsedPort,
       model: brandConfig.osName,
-      isPaired: true,
-      isConnected: true,
+      isPaired: !requiresPinPairing,
+      isConnected: !requiresPinPairing,
       lastPingMs: 16,
     };
 
     const updated = [newDev, ...deviceList.filter((d) => d.ip !== cleanIp).map((d) => ({ ...d, isConnected: false }))];
     saveDevices(updated);
-    onDeviceChange(newDev);
-    universalTV.setActiveDevice(newDev);
-
-    // Immediately ping device to test connection
-    universalTV.pingDevice(cleanIp, parsedPort);
 
     setShowAddForm(false);
     setNewDeviceName('');
     setNewDeviceIp('');
     sound.playClick('action');
+
+    if (requiresPinPairing) {
+      triggerPairing(newDev);
+    } else {
+      onDeviceChange(newDev);
+      universalTV.setActiveDevice(newDev);
+      universalTV.pingDevice(cleanIp, parsedPort);
+    }
   };
 
   return (
@@ -467,7 +527,19 @@ export function DeviceManagerModal({
                     </div>
 
                     <div className="shrink-0 flex items-center gap-1.5 pl-1">
-                      {isCurrent ? (
+                      {!dev.isPaired && TV_BRAND_CONFIG[dev.brand]?.pairingType === 'pin' ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerPairing(dev);
+                          }}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-600 hover:bg-sky-500 text-white shadow-xs cursor-pointer flex items-center gap-1"
+                        >
+                          <ShieldCheck className="w-2.5 h-2.5" />
+                          <span>Pair</span>
+                        </button>
+                      ) : isCurrent ? (
                         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white shadow-xs">
                           Active
                         </span>
@@ -537,6 +609,98 @@ export function DeviceManagerModal({
           </div>
           <WebsiteEmblem className="w-6 h-4 text-slate-400 shrink-0" />
         </div>
+
+        {/* Google TV / PIN Pairing Modal Dialog */}
+        {showPairDialog && (
+          <div className="absolute inset-0 z-30 bg-black/75 backdrop-blur-sm rounded-[44px] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="w-full max-w-[310px] bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 text-slate-800 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 mx-auto flex items-center justify-center shadow-inner">
+                {pairingState === 'verifying' || pairingState === 'starting' ? (
+                  <RefreshCw className="w-6 h-6 animate-spin text-sky-600" />
+                ) : pairingState === 'success' ? (
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                ) : (
+                  <ShieldCheck className="w-6 h-6 text-sky-600" />
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {pairingState === 'success' ? 'Connected!' : `Pair with ${showPairDialog.name}`}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  {pairingState === 'starting'
+                    ? 'Connecting to TV on Wi-Fi...'
+                    : pairingState === 'verifying'
+                    ? 'Authenticating code with TV...'
+                    : pairingState === 'success'
+                    ? 'Paired and ready to control!'
+                    : 'Look at your TV screen. Enter the 6-character code shown on screen.'}
+                </p>
+              </div>
+
+              {pairingState !== 'success' && (
+                <form onSubmit={handlePairSubmit} className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      autoFocus
+                      placeholder="e.g. 7A4B12"
+                      value={pairingPin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 6);
+                        setPairingPin(val);
+                        if (val.length === 6 && pairingState !== 'verifying') {
+                          setPairingState('verifying');
+                          setPairingError(null);
+                          universalTV.submitPairingPin(showPairDialog.ip, val);
+                        }
+                      }}
+                      className="w-full h-12 text-center text-lg font-mono font-bold tracking-[0.35em] uppercase rounded-xl border-2 border-slate-200 focus:border-sky-500 focus:outline-none bg-slate-50 text-slate-900 transition-all shadow-inner"
+                    />
+                  </div>
+
+                  {pairingError && (
+                    <div className="text-[11px] text-rose-600 font-medium bg-rose-50 border border-rose-200 rounded-lg p-2 flex items-center gap-1.5 text-left">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{pairingError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPairDialog(null);
+                        setPairingState('idle');
+                        setPairingPin('');
+                      }}
+                      className="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={pairingPin.length !== 6 || pairingState === 'verifying'}
+                      className="flex-1 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      {pairingState === 'verifying' ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <span>Pair TV</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

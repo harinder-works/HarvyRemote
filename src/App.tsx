@@ -147,6 +147,20 @@ export default function App() {
     return unsubscribe;
   }, [deviceModalOpen]);
 
+  // Auto-open pairing setup if TV requires pairing
+  useEffect(() => {
+    const unsubNeedsPair = universalTV.onNeedsPairing(() => {
+      setDeviceModalOpen(true);
+    });
+    const unsubPairCode = universalTV.onPairingCodeRequested(() => {
+      setDeviceModalOpen(true);
+    });
+    return () => {
+      unsubNeedsPair();
+      unsubPairCode();
+    };
+  }, []);
+
   // Listen for remote app launch events
   useEffect(() => {
     const handleLaunch = (e: CustomEvent<AppShortcut>) => {
