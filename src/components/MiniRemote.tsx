@@ -182,46 +182,110 @@ export function MiniRemote({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Pointer drag handlers with pointer capture
+  // Long-press timer on empty area to initiate dragging
+  const longPressTimerRef = useRef<number | null>(null);
+  const pendingTouchRef = useRef<{ clientX: number; clientY: number } | null>(null);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pendingTouchRef.current = null;
+  }, []);
+
+  // Pointer drag handlers with pointer capture on empty area
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    const isDragHandle = Boolean(target.closest('[data-drag-handle="true"]'));
-    if (!isDragHandle && target.closest('button')) {
+    if (target.closest('button') || target.closest('input')) {
       return;
     }
-    e.preventDefault();
-    e.stopPropagation();
+    const { clientX, clientY, pointerId } = e;
+    pendingTouchRef.current = { clientX, clientY };
+
     try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(pointerId);
     } catch {}
-    startDrag(e.clientX, e.clientY);
+
+    cancelLongPress();
+    longPressTimerRef.current = window.setTimeout(() => {
+      sound.playClick('soft');
+      startDrag(clientX, clientY);
+    }, 140);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+      moveDrag(e.clientX, e.clientY);
+      return;
+    }
+
+    if (pendingTouchRef.current) {
+      const dist = Math.hypot(e.clientX - pendingTouchRef.current.clientX, e.clientY - pendingTouchRef.current.clientY);
+      if (dist > 7) {
+        cancelLongPress();
+        sound.playClick('soft');
+        startDrag(e.clientX, e.clientY);
+      }
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    cancelLongPress();
+    if (isDragging) {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
+      endDrag();
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    const isDragHandle = Boolean(target.closest('[data-drag-handle="true"]'));
-    if (!isDragHandle && target.closest('button')) {
+    if (target.closest('button') || target.closest('input')) {
       return;
     }
     const t = e.touches[0];
     if (!t) return;
-    e.stopPropagation();
-    startDrag(t.clientX, t.clientY);
+
+    const { clientX, clientY } = t;
+    pendingTouchRef.current = { clientX, clientY };
+
+    cancelLongPress();
+    longPressTimerRef.current = window.setTimeout(() => {
+      sound.playClick('soft');
+      startDrag(clientX, clientY);
+    }, 140);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!dragRef.current) return;
     const t = e.touches[0];
     if (!t) return;
-    e.preventDefault();
-    e.stopPropagation();
-    moveDrag(t.clientX, t.clientY);
+
+    if (isDragging) {
+      e.preventDefault();
+      e.stopPropagation();
+      moveDrag(t.clientX, t.clientY);
+      return;
+    }
+
+    if (pendingTouchRef.current) {
+      const dist = Math.hypot(t.clientX - pendingTouchRef.current.clientX, t.clientY - pendingTouchRef.current.clientY);
+      if (dist > 7) {
+        e.preventDefault();
+        cancelLongPress();
+        sound.playClick('soft');
+        startDrag(t.clientX, t.clientY);
+      }
+    }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!dragRef.current) return;
-    e.stopPropagation();
-    endDrag();
+  const handleTouchEnd = () => {
+    cancelLongPress();
+    if (isDragging) {
+      endDrag();
+    }
   };
 
   const handleResetPosition = (e: React.MouseEvent) => {
@@ -238,22 +302,14 @@ export function MiniRemote({
   // Remote pebble content
   const pebbleContent = (
     <div
-      className="w-[158px] max-w-[96vw] rounded-[32px] border-2 border-[#D9DDE2] bg-[#EDEDF0] text-slate-800 p-2 pt-1.5 select-none remote-shadow flex flex-col items-center shrink-0 my-auto"
+      title="Long-press any empty area to move mini remote. Double-tap to reset."
+      className={`w-[158px] max-w-[96vw] rounded-[32px] border-2 bg-[#EDEDF0] text-slate-800 p-2 pt-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto transition-all ${
+        isDragging ? 'ring-2 ring-sky-400/70 shadow-2xl border-sky-300 scale-[1.02]' : 'border-[#D9DDE2]'
+      }`}
     >
-      {/* Top Dedicated Drag Pill */}
-      <div
-        data-drag-handle="true"
-        onDoubleClick={handleResetPosition}
-        className="w-full flex items-center justify-center pb-1 cursor-grab active:cursor-grabbing touch-none select-none"
-        title="Drag anywhere to move mini remote. Double-tap to reset."
-      >
-        <div className="w-8 h-1 rounded-full bg-slate-300 hover:bg-slate-400 active:bg-sky-500 transition-colors pointer-events-none" />
-      </div>
-
       {/* Top Controls (Power & Expand) */}
       <div
-        data-drag-handle="true"
-        className="w-full flex items-center justify-between pb-1 mb-1 border-b border-black/10 select-none cursor-grab active:cursor-grabbing"
+        className="w-full flex items-center justify-between pb-1 mb-1 border-b border-black/10 select-none"
       >
         <div className="flex items-center gap-1 pl-1 py-0.5 min-w-0 max-w-[85px] pointer-events-none">
           <GripHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />

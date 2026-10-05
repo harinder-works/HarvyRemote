@@ -17,13 +17,9 @@ import {
   Check,
   RotateCcw,
   GripHorizontal,
-  Move,
   RefreshCw,
   Plus,
   Trash2,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
   X,
 } from 'lucide-react';
 import { AppShortcut, PRESET_APPS, RemoteTheme } from '../types/remote';
@@ -214,75 +210,133 @@ export function GoogleTVRemote({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Pointer drag handler with pointer capture
+  // Long-press timer on empty area to initiate dragging
+  const longPressTimerRef = useRef<number | null>(null);
+  const pendingTouchRef = useRef<{ clientX: number; clientY: number } | null>(null);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pendingTouchRef.current = null;
+  }, []);
+
+  // Pointer drag handler: Long-pressing on any empty area of the remote body initiates dragging
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    const isDragHandle = Boolean(target.closest('[data-drag-handle="true"]'));
-    if (!isDragHandle && (target.closest('button') || target.closest('input'))) {
+    // Never hijack button clicks, inputs, or interactive controls
+    if (target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('[data-no-drag]')) {
       return;
     }
-    e.preventDefault();
-    e.stopPropagation();
+
+    const { clientX, clientY, pointerId } = e;
+    pendingTouchRef.current = { clientX, clientY };
+
     try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(pointerId);
     } catch {}
-    startDrag(e.clientX, e.clientY);
+
+    cancelLongPress();
+    longPressTimerRef.current = window.setTimeout(() => {
+      sound.playClick('soft');
+      startDrag(clientX, clientY);
+      showStatus('Dragging Remote');
+    }, 140);
   };
 
-  // Touch drag handler with preventDefault to guarantee Android WebView does not cancel the touch
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+      moveDrag(e.clientX, e.clientY);
+      return;
+    }
+
+    // If dragged while finger is down on empty area, initiate dragging seamlessly
+    if (pendingTouchRef.current) {
+      const dist = Math.hypot(e.clientX - pendingTouchRef.current.clientX, e.clientY - pendingTouchRef.current.clientY);
+      if (dist > 7) {
+        cancelLongPress();
+        sound.playClick('soft');
+        startDrag(e.clientX, e.clientY);
+        showStatus('Dragging Remote');
+      }
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    cancelLongPress();
+    if (isDragging) {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
+      endDrag();
+    }
+  };
+
+  // Touch drag handler for mobile and Android WebView
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    const isDragHandle = Boolean(target.closest('[data-drag-handle="true"]'));
-    if (!isDragHandle && (target.closest('button') || target.closest('input'))) {
+    if (target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('[data-no-drag]')) {
       return;
     }
     const t = e.touches[0];
     if (!t) return;
-    e.stopPropagation();
-    startDrag(t.clientX, t.clientY);
+
+    const { clientX, clientY } = t;
+    pendingTouchRef.current = { clientX, clientY };
+
+    cancelLongPress();
+    longPressTimerRef.current = window.setTimeout(() => {
+      sound.playClick('soft');
+      startDrag(clientX, clientY);
+      showStatus('Dragging Remote');
+    }, 140);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!dragRef.current) return;
     const t = e.touches[0];
     if (!t) return;
-    e.preventDefault();
-    e.stopPropagation();
-    moveDrag(t.clientX, t.clientY);
-  };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!dragRef.current) return;
-    e.stopPropagation();
-    endDrag();
-  };
-
-  // Instant snap positioning (Left, Center, Right)
-  const snapToPosition = (target: 'left' | 'center' | 'right') => {
-    sound.playClick('soft');
-    const width = window.innerWidth || 360;
-    const height = window.innerHeight || 700;
-    const remoteWidth = 246;
-
-    let x = 12;
-    if (target === 'center') {
-      x = Math.max(8, Math.round((width - remoteWidth) / 2));
-    } else if (target === 'right') {
-      x = Math.max(8, width - remoteWidth - 12);
-    } else {
-      x = 12;
+    if (isDragging) {
+      e.preventDefault();
+      e.stopPropagation();
+      moveDrag(t.clientX, t.clientY);
+      return;
     }
-    const y = Math.min(position.y, Math.max(20, height - 450));
-    setPosition({ x, y });
-    try {
-      localStorage.setItem('gtv_full_remote_pos', JSON.stringify({ x, y }));
-    } catch {}
-    showStatus(`Moved to ${target}`);
+
+    if (pendingTouchRef.current) {
+      const dist = Math.hypot(t.clientX - pendingTouchRef.current.clientX, t.clientY - pendingTouchRef.current.clientY);
+      if (dist > 7) {
+        e.preventDefault();
+        cancelLongPress();
+        sound.playClick('soft');
+        startDrag(t.clientX, t.clientY);
+        showStatus('Dragging Remote');
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    cancelLongPress();
+    if (isDragging) {
+      endDrag();
+    }
   };
 
   const handleResetPosition = (e: React.MouseEvent) => {
     e.stopPropagation();
-    snapToPosition('center');
+    sound.playClick('soft');
+    const width = window.innerWidth || 360;
+    const height = window.innerHeight || 700;
+    const remoteWidth = 246;
+    const defaultX = Math.max(8, Math.round((width - remoteWidth) / 2));
+    const defaultY = Math.max(16, Math.round((height - 520) / 2));
+    setPosition({ x: defaultX, y: defaultY });
+    try {
+      localStorage.setItem('gtv_full_remote_pos', JSON.stringify({ x: defaultX, y: defaultY }));
+    } catch {}
+    showStatus('Centered Remote');
   };
 
   // Custom App creation modal state
@@ -515,77 +569,26 @@ export function GoogleTVRemote({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onDoubleClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (!target.closest('button') && !target.closest('input')) {
+            handleResetPosition(e);
+          }
+        }}
         style={{
           transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
           willChange: 'transform',
         }}
-        className={`pointer-events-auto touch-none cursor-grab ${
-          isDragging ? 'cursor-grabbing shadow-2xl scale-[1.01]' : ''
-        } transition-shadow duration-150 inline-block remote-draggable-container`}
+        className={`pointer-events-auto touch-none ${
+          isDragging ? 'cursor-grabbing shadow-2xl scale-[1.02]' : 'cursor-grab'
+        } transition-all duration-100 inline-block remote-draggable-container`}
       >
-        <div className="w-[246px] max-w-[84vw] flex flex-col justify-center rounded-[40px] border-2 border-[#D9DDE2] bg-[#EDEDF0] remote-shadow p-2.5 pt-1.5 select-none text-slate-800 transition-all shadow-xl">
-          {/* Top Dedicated Drag Bar with Quick Dock Presets */}
-          <div
-            data-drag-handle="true"
-            onDoubleClick={handleResetPosition}
-            className="w-full flex items-center justify-between px-1.5 py-1 mb-1.5 rounded-2xl bg-[#E2E6EC] hover:bg-[#D9DEE5] active:bg-[#CFD5DD] border border-[#CBD1D9] transition-all cursor-grab active:cursor-grabbing touch-none select-none shadow-xs"
-            title="Drag to move anywhere. Tap icons to dock left/center/right, or double-tap to center."
-          >
-            {/* Dock Left button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                snapToPosition('left');
-              }}
-              title="Dock Remote Left"
-              className="p-1 rounded-md hover:bg-black/10 text-slate-500 hover:text-slate-900 transition-colors active:scale-90 cursor-pointer"
-            >
-              <AlignLeft className="w-3 h-3" />
-            </button>
-
-            {/* Grip Handle Indicator */}
-            <div className="flex items-center gap-1.5 pointer-events-none text-slate-600">
-              <Move className="w-3 h-3 text-sky-600 animate-pulse" />
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
-                Drag Remote
-              </span>
-              <div className="flex items-center gap-0.5">
-                <span className="w-1 h-1 rounded-full bg-slate-400" />
-                <span className="w-1 h-1 rounded-full bg-slate-400" />
-                <span className="w-1 h-1 rounded-full bg-slate-400" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-0.5">
-              {/* Dock Center button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  snapToPosition('center');
-                }}
-                title="Center Remote"
-                className="p-1 rounded-md hover:bg-black/10 text-slate-500 hover:text-slate-900 transition-colors active:scale-90 cursor-pointer"
-              >
-                <AlignCenter className="w-3 h-3" />
-              </button>
-
-              {/* Dock Right button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  snapToPosition('right');
-                }}
-                title="Dock Remote Right"
-                className="p-1 rounded-md hover:bg-black/10 text-slate-500 hover:text-slate-900 transition-colors active:scale-90 cursor-pointer"
-              >
-                <AlignRight className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
+        <div
+          title="Long-press any empty area to move remote. Double-tap to center."
+          className={`w-[246px] max-w-[84vw] flex flex-col justify-center rounded-[40px] border-2 bg-[#EDEDF0] remote-shadow p-2.5 pt-2 select-none text-slate-800 transition-all shadow-xl ${
+            isDragging ? 'ring-2 ring-sky-400/70 shadow-2xl border-sky-300' : 'border-[#D9DDE2]'
+          }`}
+        >
           {/* 1. TOP HEADER APP BAR: TV Pill & Controls */}
           <div className="w-full flex items-center justify-between pb-1.5 mb-1.5 border-b border-black/10">
             {/* TV Device Connection Pill Button */}
