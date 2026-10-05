@@ -1,0 +1,7 @@
+{
+  "name": "Google TV Remote",
+  "description": "Authentic Google TV voice remote with customizable app shortcuts, draggable mini remote, and interactive TV display.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
