@@ -2,18 +2,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Maximize2,
   GripHorizontal,
-  Move,
-  ArrowLeft,
-  Home,
   VolumeX,
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Power,
+  Play,
+  Pause,
   X,
 } from 'lucide-react';
-import { GoogleDots, GoogleAssistantLines } from './BrandIcons';
 import { sound } from '../utils/audio';
 import { RemoteTheme } from '../types/remote';
 import { SmartTVDevice } from '../utils/universalTVProtocol';
@@ -299,22 +293,22 @@ export function MiniRemote({
     } catch {}
   };
 
-  // Remote pebble content
+  // Remote pebble content (Sleek Minimal: Header, Play/Pause OK, Volume & Mute)
   const pebbleContent = (
     <div
       title="Long-press any empty area to move mini remote. Double-tap to reset."
-      className={`w-[180px] max-w-[96vw] rounded-[32px] border-2 bg-[#EDEDF0] text-slate-800 p-2.5 pt-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto transition-all ${
+      className={`w-[154px] max-w-[94vw] rounded-[26px] border-2 bg-[#EDEDF0] text-slate-800 p-2.5 pt-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto transition-all ${
         isDragging ? 'ring-2 ring-sky-400/70 shadow-2xl border-sky-300 scale-[1.02]' : 'border-[#D9DDE2]'
       }`}
     >
       {/* Top Controls (Power & Expand) */}
       <div
-        className="w-full flex items-center justify-between pb-1 mb-1 border-b border-black/10 select-none"
+        className="w-full flex items-center justify-between pb-1.5 mb-2 border-b border-black/10 select-none"
       >
-        <div className="flex items-center gap-1 pl-1 py-0.5 min-w-0 max-w-[85px] pointer-events-none">
-          <GripHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 truncate">
-            {connectedDevice ? connectedDevice.name : 'Google TV'}
+        <div className="flex items-center gap-1 pl-0.5 py-0.5 min-w-0 max-w-[70px] pointer-events-none">
+          <GripHorizontal className="w-3 h-3 text-slate-400 shrink-0" />
+          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 truncate">
+            {connectedDevice ? connectedDevice.name : 'TV'}
           </span>
           {connectedDevice?.isConnected && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -325,197 +319,110 @@ export function MiniRemote({
           {/* Power Button */}
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               sound.playClick('action');
               onPowerPress();
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="TV Power"
-            className="p-1 rounded-full hover:bg-black/10 text-emerald-600 transition-colors active:scale-90 cursor-pointer"
+            className="w-6 h-6 rounded-full hover:bg-black/10 flex items-center justify-center text-emerald-600 transition-colors active:scale-90 cursor-pointer touch-manipulation"
           >
-            <Power className="w-3 h-3" />
+            <Power className="w-3.5 h-3.5" />
           </button>
 
           {/* Expand to Full Remote Button */}
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               sound.playClick('action');
               onExpand();
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="Expand to Full Remote"
-            className="p-1 rounded-full hover:bg-black/10 text-sky-600 transition-colors active:scale-90 cursor-pointer"
+            className="w-6 h-6 rounded-full hover:bg-black/10 flex items-center justify-center text-sky-600 transition-colors active:scale-90 cursor-pointer touch-manipulation"
           >
-            <Maximize2 className="w-3 h-3" />
+            <Maximize2 className="w-3.5 h-3.5" />
           </button>
 
           {/* Close Remote Button */}
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               sound.playClick('soft');
               onCloseApp?.();
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="Close Remote & Exit"
-            className="p-1 rounded-full hover:bg-rose-100 text-rose-500 hover:text-rose-700 transition-colors active:scale-90 cursor-pointer"
+            className="w-6 h-6 rounded-full hover:bg-rose-100 flex items-center justify-center text-rose-500 hover:text-rose-700 transition-colors active:scale-90 cursor-pointer touch-manipulation"
           >
-            <X className="w-3 h-3 stroke-[2.2]" />
+            <X className="w-3.5 h-3.5 stroke-[2.2]" />
           </button>
         </div>
       </div>
 
-      {/* Separated Mini Directional Controls - Zero Overlap */}
-      <div className="flex flex-col items-center justify-center select-none my-1 py-0.5">
-        {/* Up */}
+      {/* Main Play / Pause (OK Button) */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          sound.playClick('action');
+          onSelectPress();
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        title="Play / Pause (OK / Select)"
+        className="w-full h-11 mb-2 rounded-2xl bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center gap-1.5 cursor-pointer text-slate-700 font-semibold text-xs tracking-wide transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
+      >
+        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+        <span>OK</span>
+        <Pause className="w-3.5 h-3.5 fill-current" />
+      </button>
+
+      {/* Volume Controls & Mute Row */}
+      <div className="grid grid-cols-3 gap-1.5 w-full">
+        {/* Volume Down */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            sound.playClick('dpad');
-            onDpadPress('up');
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          title="Up"
-          className="w-12 h-8 mb-1.5 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
-        >
-          <ChevronUp className="w-4 h-4 stroke-[1.8]" />
-        </button>
-
-        {/* Middle row */}
-        <div className="flex items-center justify-center gap-2">
-          {/* Left */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sound.playClick('dpad');
-              onDpadPress('left');
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            title="Left"
-            className="w-8 h-12 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
-          >
-            <ChevronLeft className="w-4 h-4 stroke-[1.8]" />
-          </button>
-
-          {/* OK */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sound.playClick('action');
-              onSelectPress();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            title="Select / OK"
-            className="w-12 h-12 rounded-full bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-sm flex items-center justify-center text-[11px] font-semibold text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none ring-1 ring-black/5"
-          >
-            OK
-          </button>
-
-          {/* Right */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sound.playClick('dpad');
-              onDpadPress('right');
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            title="Right"
-            className="w-8 h-12 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
-          >
-            <ChevronRight className="w-4 h-4 stroke-[1.8]" />
-          </button>
-        </div>
-
-        {/* Down */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('dpad');
-            onDpadPress('down');
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          title="Down"
-          className="w-12 h-8 mt-1.5 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
-        >
-          <ChevronDown className="w-4 h-4 stroke-[1.8]" />
-        </button>
-      </div>
-
-      {/* Row 1: Back, Voice Assistant, Home */}
-      <div className="grid grid-cols-3 gap-1 w-full my-0.5">
-        <button
-          type="button"
-          onClick={() => {
-            sound.playClick('button');
-            onBackPress();
-          }}
-          title="Back"
-          className="h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 transition-all text-slate-700 cursor-pointer"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-        </button>
-
-        <button
-          type="button"
-          onClick={onVoicePress}
-          title="Google Assistant Voice Search (Listen)"
-          className={`h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 transition-all cursor-pointer ${
-            isListening ? 'ring-2 ring-sky-400 bg-sky-100' : ''
-          }`}
-        >
-          <GoogleAssistantLines size="sm" active={isListening} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            sound.playClick('button');
-            onHomePress();
-          }}
-          title="Home"
-          className="h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 transition-all text-slate-700 cursor-pointer"
-        >
-          <Home className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* Row 2: Volume Controls & Mute */}
-      <div className="grid grid-cols-3 gap-1 w-full my-0.5">
-        <button
-          type="button"
-          onClick={() => {
             sound.playClick('dpad');
             onVolumeChange(-5);
           }}
-          title="Volume Down"
-          className="h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 text-xs font-bold text-slate-700 cursor-pointer"
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Volume Down (−)"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-base font-bold text-slate-700 cursor-pointer touch-manipulation focus:outline-none"
         >
           −
         </button>
 
+        {/* Mute */}
         <button
           type="button"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             sound.playClick('button');
             onMutePress();
           }}
-          title="Mute"
-          className="h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 text-slate-700 cursor-pointer"
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Mute Audio"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-rose-100 active:text-rose-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-slate-700 cursor-pointer touch-manipulation focus:outline-none"
         >
-          <VolumeX className="w-3 h-3" />
+          <VolumeX className="w-4 h-4 stroke-[1.8]" />
         </button>
 
+        {/* Volume Up */}
         <button
           type="button"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             sound.playClick('dpad');
             onVolumeChange(5);
           }}
-          title="Volume Up"
-          className="h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D3D8E0] remote-button-shadow flex items-center justify-center active:scale-95 text-xs font-bold text-slate-700 cursor-pointer"
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Volume Up (+)"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-base font-bold text-slate-700 cursor-pointer touch-manipulation focus:outline-none"
         >
           +
         </button>
