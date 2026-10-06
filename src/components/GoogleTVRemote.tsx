@@ -727,14 +727,14 @@ export function GoogleTVRemote({
                     handleDpad('up');
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="w-[72px] h-[50px] mb-2.5 rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  className="w-[70px] h-[48px] mb-2 rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                   title="Navigate Up"
                 >
-                  <ChevronUp className="w-7 h-7 stroke-[3]" />
+                  <ChevronUp className="w-5 h-5 stroke-[1.8]" />
                 </button>
 
                 {/* MIDDLE ROW: LEFT, CENTER OK, RIGHT */}
-                <div className="flex items-center justify-center gap-3 my-0.5">
+                <div className="flex items-center justify-center gap-2.5 my-0.5">
                   {/* LEFT KEY (Isolated) */}
                   <button
                     type="button"
@@ -743,13 +743,13 @@ export function GoogleTVRemote({
                       handleDpad('left');
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="w-[50px] h-[72px] rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                    className="w-[48px] h-[70px] rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                     title="Navigate Left"
                   >
-                    <ChevronLeft className="w-7 h-7 stroke-[3]" />
+                    <ChevronLeft className="w-5 h-5 stroke-[1.8]" />
                   </button>
 
-                  {/* CENTER OK BUTTON (Standalone raised disc) */}
+                  {/* CENTER OK BUTTON (Standalone refined disc) */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -758,7 +758,7 @@ export function GoogleTVRemote({
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
                     title="Select / OK"
-                    className="w-[72px] h-[72px] rounded-full bg-gradient-to-b from-[#F5F8FA] to-[#DFE3E8] hover:from-[#EAEEF3] hover:to-[#D5D9DF] active:from-sky-500 active:to-sky-600 active:text-white border-2 border-[#C5CBD4] shadow-lg flex items-center justify-center cursor-pointer text-slate-800 font-black text-sm tracking-widest transition-all active:scale-95 touch-manipulation focus:outline-none ring-2 ring-white/70"
+                    className="w-[70px] h-[70px] rounded-full bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-[0_3px_8px_rgba(0,0,0,0.09),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-center cursor-pointer text-slate-700 font-semibold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
                   >
                     OK
                   </button>
@@ -771,10 +771,10 @@ export function GoogleTVRemote({
                       handleDpad('right');
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="w-[50px] h-[72px] rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                    className="w-[48px] h-[70px] rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                     title="Navigate Right"
                   >
-                    <ChevronRight className="w-7 h-7 stroke-[3]" />
+                    <ChevronRight className="w-5 h-5 stroke-[1.8]" />
                   </button>
                 </div>
 
@@ -786,10 +786,10 @@ export function GoogleTVRemote({
                     handleDpad('down');
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="w-[72px] h-[50px] mt-2.5 rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  className="w-[70px] h-[48px] mt-2 rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                   title="Navigate Down"
                 >
-                  <ChevronDown className="w-7 h-7 stroke-[3]" />
+                  <ChevronDown className="w-5 h-5 stroke-[1.8]" />
                 </button>
               </div>
             ) : (

@@ -375,9 +375,9 @@ export function MiniRemote({
           }}
           onPointerDown={(e) => e.stopPropagation()}
           title="Up"
-          className="w-13 h-8 mb-1.5 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
+          className="w-12 h-8 mb-1.5 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
         >
-          <ChevronUp className="w-4 h-4 stroke-[2.8]" />
+          <ChevronUp className="w-4 h-4 stroke-[1.8]" />
         </button>
 
         {/* Middle row */}
@@ -392,9 +392,9 @@ export function MiniRemote({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             title="Left"
-            className="w-8 h-13 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
+            className="w-8 h-12 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
           >
-            <ChevronLeft className="w-4 h-4 stroke-[2.8]" />
+            <ChevronLeft className="w-4 h-4 stroke-[1.8]" />
           </button>
 
           {/* OK */}
@@ -407,7 +407,7 @@ export function MiniRemote({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             title="Select / OK"
-            className="w-13 h-13 rounded-full bg-gradient-to-b from-[#F5F8FA] to-[#DFE3E8] hover:from-[#EAEEF3] hover:to-[#D5D9DF] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-md flex items-center justify-center text-xs font-black text-slate-800 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none ring-1 ring-white/70"
+            className="w-12 h-12 rounded-full bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-sm flex items-center justify-center text-[11px] font-semibold text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none ring-1 ring-black/5"
           >
             OK
           </button>
@@ -422,9 +422,9 @@ export function MiniRemote({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             title="Right"
-            className="w-8 h-13 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
+            className="w-8 h-12 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
           >
-            <ChevronRight className="w-4 h-4 stroke-[2.8]" />
+            <ChevronRight className="w-4 h-4 stroke-[1.8]" />
           </button>
         </div>
 
@@ -438,9 +438,9 @@ export function MiniRemote({
           }}
           onPointerDown={(e) => e.stopPropagation()}
           title="Down"
-          className="w-13 h-8 mt-1.5 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
+          className="w-12 h-8 mt-1.5 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
         >
-          <ChevronDown className="w-4 h-4 stroke-[2.8]" />
+          <ChevronDown className="w-4 h-4 stroke-[1.8]" />
         </button>
       </div>
 
