@@ -465,6 +465,8 @@ public class NativeTVManager {
             if (sc == null) return null;
 
             SSLSocket socket = (SSLSocket) sc.getSocketFactory().createSocket();
+            socket.setTcpNoDelay(true);
+            socket.setKeepAlive(true);
             socket.setSoTimeout(4000);
             socket.connect(new InetSocketAddress(ip, 6466), 2500);
             socket.startHandshake();

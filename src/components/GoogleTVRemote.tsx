@@ -585,7 +585,7 @@ export function GoogleTVRemote({
       >
         <div
           title="Long-press any empty area to move remote. Double-tap to center."
-          className={`w-[246px] max-w-[84vw] flex flex-col justify-center rounded-[40px] border-2 bg-[#EDEDF0] remote-shadow p-2.5 pt-2 select-none text-slate-800 transition-all shadow-xl ${
+          className={`w-[274px] max-w-[90vw] flex flex-col justify-center rounded-[40px] border-2 bg-[#EDEDF0] remote-shadow p-3 pt-2 select-none text-slate-800 transition-all shadow-xl ${
             isDragging ? 'ring-2 ring-sky-400/70 shadow-2xl border-sky-300' : 'border-[#D9DDE2]'
           }`}
         >
@@ -714,59 +714,82 @@ export function GoogleTVRemote({
             </button>
           </div>
 
-          {/* 3. PRIMARY INTERACTION AREA: D-PAD OR SWIPE TRACKPAD */}
-          <div className="w-full flex flex-col items-center justify-center my-1">
+          {/* 3. PRIMARY INTERACTION AREA: SEPARATED D-PAD OR SWIPE TRACKPAD */}
+          <div className="w-full flex flex-col items-center justify-center my-2">
             {controlMode === 'dpad' ? (
-              /* Ergonomic D-Pad Ring */
-              <div className="relative w-[166px] h-[166px] flex items-center justify-center">
-                {/* Directional Pad Outer Circle */}
-                <div className="absolute inset-0 rounded-full bg-[#DFE3E8] border border-[#CFD4DC] dpad-groove shadow-md">
-                  {/* Up */}
+              /* Ergonomic Separated Directional Controls - Zero Overlap */
+              <div className="flex flex-col items-center justify-center select-none py-1">
+                {/* UP KEY (Isolated) */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDpad('up');
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="w-[72px] h-[50px] mb-2.5 rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  title="Navigate Up"
+                >
+                  <ChevronUp className="w-7 h-7 stroke-[3]" />
+                </button>
+
+                {/* MIDDLE ROW: LEFT, CENTER OK, RIGHT */}
+                <div className="flex items-center justify-center gap-3 my-0.5">
+                  {/* LEFT KEY (Isolated) */}
                   <button
                     type="button"
-                    onClick={() => handleDpad('up')}
-                    className="absolute top-0 left-0 right-0 h-[46px] flex items-center justify-center pt-1 cursor-pointer text-slate-600 hover:text-black active:scale-95 transition-all"
-                    title="Navigate Up"
-                  >
-                    <ChevronUp className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                  {/* Down */}
-                  <button
-                    type="button"
-                    onClick={() => handleDpad('down')}
-                    className="absolute bottom-0 left-0 right-0 h-[46px] flex items-center justify-center pb-1 cursor-pointer text-slate-600 hover:text-black active:scale-95 transition-all"
-                    title="Navigate Down"
-                  >
-                    <ChevronDown className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                  {/* Left */}
-                  <button
-                    type="button"
-                    onClick={() => handleDpad('left')}
-                    className="absolute left-0 top-0 bottom-0 w-[46px] flex items-center justify-center pl-1 cursor-pointer text-slate-600 hover:text-black active:scale-95 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDpad('left');
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="w-[50px] h-[72px] rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                     title="Navigate Left"
                   >
-                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                    <ChevronLeft className="w-7 h-7 stroke-[3]" />
                   </button>
-                  {/* Right */}
+
+                  {/* CENTER OK BUTTON (Standalone raised disc) */}
                   <button
                     type="button"
-                    onClick={() => handleDpad('right')}
-                    className="absolute right-0 top-0 bottom-0 w-[46px] flex items-center justify-center pr-1 cursor-pointer text-slate-600 hover:text-black active:scale-95 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelect();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    title="Select / OK"
+                    className="w-[72px] h-[72px] rounded-full bg-gradient-to-b from-[#F5F8FA] to-[#DFE3E8] hover:from-[#EAEEF3] hover:to-[#D5D9DF] active:from-sky-500 active:to-sky-600 active:text-white border-2 border-[#C5CBD4] shadow-lg flex items-center justify-center cursor-pointer text-slate-800 font-black text-sm tracking-widest transition-all active:scale-95 touch-manipulation focus:outline-none ring-2 ring-white/70"
+                  >
+                    OK
+                  </button>
+
+                  {/* RIGHT KEY (Isolated) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDpad('right');
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="w-[50px] h-[72px] rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                     title="Navigate Right"
                   >
-                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                    <ChevronRight className="w-7 h-7 stroke-[3]" />
                   </button>
                 </div>
 
-                {/* Center OK Button */}
+                {/* DOWN KEY (Isolated) */}
                 <button
                   type="button"
-                  onClick={handleSelect}
-                  title="Select / OK"
-                  className="relative z-10 w-[58px] h-[58px] rounded-full bg-[#EAEEF3] hover:bg-[#E2E6EC] border border-[#D5DAE2] shadow-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer text-slate-800 font-bold text-xs tracking-wider"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDpad('down');
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="w-[72px] h-[50px] mt-2.5 rounded-2xl bg-[#E2E6EB] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border-2 border-[#CBD1DB] shadow-md flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  title="Navigate Down"
                 >
-                  OK
+                  <ChevronDown className="w-7 h-7 stroke-[3]" />
                 </button>
               </div>
             ) : (
@@ -774,7 +797,7 @@ export function GoogleTVRemote({
               <div
                 onPointerDown={handleTrackpadPointerDown}
                 onPointerUp={handleTrackpadPointerUp}
-                className="w-[168px] h-[166px] rounded-2xl bg-[#DFE3E8] border border-[#CFD4DC] shadow-inner flex flex-col items-center justify-center text-center p-2.5 cursor-pointer touch-none active:bg-[#D5D9DF] transition-colors"
+                className="w-[190px] h-[184px] rounded-2xl bg-[#DFE3E8] border border-[#CFD4DC] shadow-inner flex flex-col items-center justify-center text-center p-2.5 cursor-pointer touch-none active:bg-[#D5D9DF] transition-colors"
               >
                 <MousePointer className="w-5 h-5 text-sky-600 mb-1 opacity-80" />
                 <span className="text-[10px] font-semibold text-slate-700">Swipe to Navigate</span>

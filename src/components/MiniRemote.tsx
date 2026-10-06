@@ -303,7 +303,7 @@ export function MiniRemote({
   const pebbleContent = (
     <div
       title="Long-press any empty area to move mini remote. Double-tap to reset."
-      className={`w-[158px] max-w-[96vw] rounded-[32px] border-2 bg-[#EDEDF0] text-slate-800 p-2 pt-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto transition-all ${
+      className={`w-[180px] max-w-[96vw] rounded-[32px] border-2 bg-[#EDEDF0] text-slate-800 p-2.5 pt-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto transition-all ${
         isDragging ? 'ring-2 ring-sky-400/70 shadow-2xl border-sky-300 scale-[1.02]' : 'border-[#D9DDE2]'
       }`}
     >
@@ -363,71 +363,84 @@ export function MiniRemote({
         </div>
       </div>
 
-      {/* Mini D-Pad */}
-      <div className="relative w-[104px] h-[104px] mx-auto my-0.5 flex items-center justify-center">
-        {/* Directional Pad Ring */}
-        <div className="absolute inset-0 rounded-full bg-[#DFE3E8] border border-[#CFD4DC] dpad-groove">
-          {/* Up */}
-          <button
-            type="button"
-            onClick={() => {
-              sound.playClick('dpad');
-              onDpadPress('up');
-            }}
-            title="Up"
-            className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center pt-0.5 text-slate-600 hover:text-black active:scale-90 transition-transform cursor-pointer"
-          >
-            <ChevronUp className="w-3.5 h-3.5" />
-          </button>
-          {/* Down */}
-          <button
-            type="button"
-            onClick={() => {
-              sound.playClick('dpad');
-              onDpadPress('down');
-            }}
-            title="Down"
-            className="absolute bottom-0 left-0 right-0 h-8 flex items-center justify-center pb-0.5 text-slate-600 hover:text-black active:scale-90 transition-transform cursor-pointer"
-          >
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
+      {/* Separated Mini Directional Controls - Zero Overlap */}
+      <div className="flex flex-col items-center justify-center select-none my-1 py-0.5">
+        {/* Up */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            sound.playClick('dpad');
+            onDpadPress('up');
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Up"
+          className="w-13 h-8 mb-1.5 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
+        >
+          <ChevronUp className="w-4 h-4 stroke-[2.8]" />
+        </button>
+
+        {/* Middle row */}
+        <div className="flex items-center justify-center gap-2">
           {/* Left */}
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               sound.playClick('dpad');
               onDpadPress('left');
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="Left"
-            className="absolute left-0 top-0 bottom-0 w-8 flex items-center justify-center pl-0.5 text-slate-600 hover:text-black active:scale-90 transition-transform cursor-pointer"
+            className="w-8 h-13 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-4 h-4 stroke-[2.8]" />
           </button>
+
+          {/* OK */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              sound.playClick('action');
+              onSelectPress();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="Select / OK"
+            className="w-13 h-13 rounded-full bg-gradient-to-b from-[#F5F8FA] to-[#DFE3E8] hover:from-[#EAEEF3] hover:to-[#D5D9DF] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-md flex items-center justify-center text-xs font-black text-slate-800 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none ring-1 ring-white/70"
+          >
+            OK
+          </button>
+
           {/* Right */}
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               sound.playClick('dpad');
               onDpadPress('right');
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="Right"
-            className="absolute right-0 top-0 bottom-0 w-8 flex items-center justify-center pr-0.5 text-slate-600 hover:text-black active:scale-90 transition-transform cursor-pointer"
+            className="w-8 h-13 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4 stroke-[2.8]" />
           </button>
         </div>
 
-        {/* Center OK */}
+        {/* Down */}
         <button
           type="button"
-          onClick={() => {
-            sound.playClick('action');
-            onSelectPress();
+          onClick={(e) => {
+            e.stopPropagation();
+            sound.playClick('dpad');
+            onDpadPress('down');
           }}
-          title="Select / OK"
-          className="relative z-10 w-9 h-9 rounded-full bg-[#EAEEF3] border border-[#D5DAE2] remote-button-shadow active:scale-90 transition-transform flex items-center justify-center text-[10px] font-bold text-slate-700 cursor-pointer"
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Down"
+          className="w-13 h-8 mt-1.5 rounded-xl bg-[#DFE3E8] hover:bg-[#D5D9DF] active:bg-sky-200 active:text-sky-800 border border-[#CBD1DB] shadow-sm flex items-center justify-center text-slate-700 active:scale-90 transition-transform cursor-pointer touch-manipulation focus:outline-none"
         >
-          OK
+          <ChevronDown className="w-4 h-4 stroke-[2.8]" />
         </button>
       </div>
 
