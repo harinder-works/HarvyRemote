@@ -185,14 +185,14 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onNewIntent(Intent intent) {
+    public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
         handleIntent(intent);
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         if (floatingManager != null) {
             WebView webView = getBridge().getWebView();
