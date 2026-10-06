@@ -17,7 +17,8 @@ import {
   SmartTVDevice,
   UniversalCommandLog,
 } from './utils/universalTVProtocol';
-import { GoogleDots } from './components/BrandIcons';
+import { GoogleDots, AppIconRenderer } from './components/BrandIcons';
+import { Layers, Tv } from 'lucide-react';
 
 export default function App() {
   // Always the classic white (Snow) Google TV remote
@@ -31,6 +32,16 @@ export default function App() {
 
   const [isPip, setIsPip] = useState(false);
   const [isAppClosed, setIsAppClosed] = useState(false);
+  const [hasOverlayPermission, setHasOverlayPermission] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hasOverlayPermission) {
+      try {
+        return Boolean((window as any).AndroidNativeBridge.hasOverlayPermission());
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  });
 
   const handleCloseApp = () => {
     sound.playClick('soft');
@@ -53,7 +64,7 @@ export default function App() {
     }
   };
 
-  // Listen for native Android Picture-in-Picture mode events
+  // Listen for native Android Picture-in-Picture & Overlay permission events
   useEffect(() => {
     const handlePip = (e: any) => {
       const pipActive = Boolean(e.detail?.isPip);
@@ -64,20 +75,56 @@ export default function App() {
         setRemoteMode('full');
       }
     };
+
+    const handleOverlayStatus = (e: any) => {
+      if (typeof e.detail?.granted === 'boolean') {
+        setHasOverlayPermission(e.detail.granted);
+        if (e.detail.granted) {
+          handleEnterFloating();
+        }
+      }
+    };
+
     window.addEventListener('pip-mode-changed', handlePip);
-    return () => window.removeEventListener('pip-mode-changed', handlePip);
+    window.addEventListener('overlay-permission-status', handleOverlayStatus);
+    return () => {
+      window.removeEventListener('pip-mode-changed', handlePip);
+      window.removeEventListener('overlay-permission-status', handleOverlayStatus);
+    };
   }, []);
 
   const handleEnterFloating = () => {
     sound.playClick('action');
     setRemoteMode('mini');
     setIsPip(false);
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hasOverlayPermission) {
+      const hasPerm = (window as any).AndroidNativeBridge.hasOverlayPermission();
+      if (!hasPerm) {
+        setHasOverlayPermission(false);
+        (window as any).AndroidNativeBridge.requestOverlayPermission();
+        return;
+      }
+    }
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.startFloatingRemote) {
+      try {
+        (window as any).AndroidNativeBridge.startFloatingRemote();
+      } catch (e) {
+        console.error(e);
+      }
+    }
   };
 
   const handleExitFloating = () => {
     sound.playClick('action');
     setRemoteMode('full');
     setIsPip(false);
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hideFloatingRemote) {
+      try {
+        (window as any).AndroidNativeBridge.hideFloatingRemote();
+      } catch (e) {
+        console.error(e);
+      }
+    }
   };
 
   // Active connected Smart TV
@@ -171,10 +218,20 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Auto-fetch TV apps when connected device is available
+  // Auto-fetch TV apps when connected device is available & sync with floating remote
   useEffect(() => {
     if (connectedDevice?.ip) {
       universalTV.fetchInstalledApps(connectedDevice.brand, connectedDevice.ip, connectedDevice.port);
+      if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.updateFloatingDeviceInfo) {
+        try {
+          (window as any).AndroidNativeBridge.updateFloatingDeviceInfo(
+            connectedDevice.brand,
+            connectedDevice.ip,
+            connectedDevice.port,
+            connectedDevice.name
+          );
+        } catch {}
+      }
     }
   }, [connectedDevice]);
 
@@ -421,14 +478,79 @@ export default function App() {
   }, []);
 
   return (
-    <div className="w-full min-h-screen select-none bg-transparent overflow-hidden pointer-events-none">
-      {/* 
-        NO WEBSITE HEADER.
-        NO OUTSIDE BUTTONS.
-        NO HEAVY BACKGROUND OVERLAYS.
-        The screen passes through touches so users can use other apps.
-        Only the remote itself captures touches.
-      */}
+    <div className="w-full min-h-screen select-none bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D] overflow-hidden pointer-events-none">
+      {/* Top Multi-tasking Bar: Allows floating over other apps & parallel usage */}
+      {!isAppClosed && (
+        <div className="fixed top-3 left-4 right-4 z-40 pointer-events-auto flex items-center justify-between">
+          {/* Connected Device Pill */}
+          <button
+            type="button"
+            onClick={() => setDeviceModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-white/15 shadow-md text-[11px] font-semibold cursor-pointer active:scale-95 transition-all"
+          >
+            <Tv className="w-3.5 h-3.5 text-sky-400" />
+            <span className="truncate max-w-[90px]">
+              {connectedDevice ? connectedDevice.name : 'Connect TV'}
+            </span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                connectedDevice ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+          </button>
+
+          {/* Float over Apps / Parallel Mode button */}
+          <button
+            type="button"
+            onClick={handleEnterFloating}
+            title="Float over other apps on your screen (Use apps in parallel)"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-lg text-[11px] font-bold cursor-pointer active:scale-95 transition-all"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Float over Apps</span>
+          </button>
+        </div>
+      )}
+
+      {/* Floating Permission Helper Banner (When overlay permission is required) */}
+      {!isAppClosed && !hasOverlayPermission && (
+        <div className="fixed top-14 left-4 right-4 z-40 pointer-events-auto bg-sky-950/80 border border-sky-400/40 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-sky-100">
+          <div className="text-xs">
+            <span className="font-bold text-sky-300 block">Multitask & Float Over Apps</span>
+            <span className="text-[11px] text-slate-300">Allow overlay permission to keep remote on screen while using other apps.</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleEnterFloating}
+            className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shrink-0 cursor-pointer shadow-md active:scale-95 transition-all"
+          >
+            Enable
+          </button>
+        </div>
+      )}
+
+      {/* Bottom TV Apps Quick Shelf: Visible and interactive so screen is never blank */}
+      {!isAppClosed && remoteMode === 'full' && (
+        <div className="fixed bottom-3 left-4 right-4 z-30 pointer-events-auto flex items-center gap-2 overflow-x-auto no-scrollbar py-1.5 px-3 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-xl">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 pl-1">
+            TV Apps:
+          </span>
+          {installedApps.slice(0, 8).map((app) => (
+            <button
+              key={app.id}
+              type="button"
+              onClick={() => handleLaunchApp(app)}
+              title={`Launch ${app.name} on TV`}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium shrink-0 transition-all active:scale-95 cursor-pointer"
+            >
+              <div style={{ color: app.brandColor }} className="shrink-0">
+                <AppIconRenderer iconType={app.iconType} className="w-3.5 h-3.5" />
+              </div>
+              <span className="truncate max-w-[65px]">{app.shortLabel}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Voice Search Floating Toast */}
       {isVoiceActive && !isAppClosed && (

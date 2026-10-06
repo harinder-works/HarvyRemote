@@ -1,8 +1,8 @@
 package com.harvy.remote;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
@@ -13,22 +13,36 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
+    private boolean isLaunchedFromExpand = false;
+    private FloatingRemoteManager floatingManager;
+
+    private void handleIntent(Intent intent) {
+        if (intent != null && "EXPAND".equals(intent.getStringExtra("LAUNCH_MODE"))) {
+            isLaunchedFromExpand = true;
+        } else {
+            isLaunchedFromExpand = false;
+        }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        handleIntent(getIntent());
+
         try {
             // Enable hardware acceleration
             getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
-            getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            // Solid dark background for full remote mode (never translucent wallpaper)
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
             getWindow().getDecorView().setFitsSystemWindows(true);
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
                 webView.setFitsSystemWindows(true);
-                webView.setBackgroundColor(Color.TRANSPARENT);
+                webView.setBackgroundColor(Color.parseColor("#0B0F19"));
 
                 // Hardware compositing layer for 60/120fps UI
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -47,20 +61,63 @@ public class MainActivity extends BridgeActivity {
                 NativeTVManager tvManager = new NativeTVManager(MainActivity.this, webView);
                 webView.addJavascriptInterface(tvManager, "NativeTVManager");
 
+                floatingManager = FloatingRemoteManager.getInstance();
+                floatingManager.init(MainActivity.this, tvManager);
+
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enterPip() {
-                        // Keep interactive in-app floating mode; do not enter OS video PiP
+                        startFloatingRemote();
                     }
 
                     @JavascriptInterface
                     public void exitPip() {
-                        // Exit back to full remote
+                        hideFloatingRemote();
                     }
 
                     @JavascriptInterface
                     public boolean isPipSupported() {
-                        return false;
+                        return true;
+                    }
+
+                    @JavascriptInterface
+                    public void startFloatingRemote() {
+                        isLaunchedFromExpand = false;
+                        floatingManager.showFloatingRemote();
+                    }
+
+                    @JavascriptInterface
+                    public void hideFloatingRemote() {
+                        floatingManager.hideFloatingRemote();
+                    }
+
+                    @JavascriptInterface
+                    public boolean hasOverlayPermission() {
+                        return floatingManager.canDrawOverlays();
+                    }
+
+                    @JavascriptInterface
+                    public void requestOverlayPermission() {
+                        floatingManager.requestOverlayPermission();
+                    }
+
+                    @JavascriptInterface
+                    public void updateFloatingDeviceInfo(String brand, String ip, int port, String name) {
+                        floatingManager.updateDeviceInfo(brand, ip, port, name);
+                    }
+
+                    @JavascriptInterface
+                    public void setWindowMode(String mode) {
+                        if ("mini".equalsIgnoreCase(mode)) {
+                            startFloatingRemote();
+                        } else {
+                            hideFloatingRemote();
+                        }
+                    }
+
+                    @JavascriptInterface
+                    public boolean isExpandMode() {
+                        return isLaunchedFromExpand;
                     }
 
                     @JavascriptInterface
@@ -112,6 +169,9 @@ public class MainActivity extends BridgeActivity {
                     public void closeApp() {
                         runOnUiThread(() -> {
                             try {
+                                if (floatingManager != null) {
+                                    floatingManager.hideFloatingRemote();
+                                }
                                 finishAffinity();
                             } catch (Exception e) {
                                 finish();
@@ -120,8 +180,35 @@ public class MainActivity extends BridgeActivity {
                     }
                 }, "AndroidNativeBridge");
             }
-        } catch (Exception e) {
-            // ignore
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (floatingManager != null) {
+            WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                boolean hasPermission = floatingManager.canDrawOverlays();
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: " + hasPermission + " } }));",
+                    null
+                );
+            }
+
+            // If user launches app normally (not expanded from floating remote) and overlay permission is granted:
+            // automatically show the floating remote and minimize activity so they can use other apps in parallel!
+            if (!isLaunchedFromExpand && floatingManager.canDrawOverlays()) {
+                floatingManager.showFloatingRemote();
+            }
         }
     }
 
@@ -131,5 +218,3 @@ public class MainActivity extends BridgeActivity {
         finish();
     }
 }
-
-
