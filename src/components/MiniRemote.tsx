@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Maximize2,
-  GripHorizontal,
   VolumeX,
   Power,
   Play,
@@ -305,17 +304,16 @@ export function MiniRemote({
       <div
         className="w-full flex items-center justify-between pb-1.5 mb-2 border-b border-black/10 select-none"
       >
-        <div className="flex items-center gap-1 pl-0.5 py-0.5 min-w-0 max-w-[70px] pointer-events-none">
-          <GripHorizontal className="w-3 h-3 text-slate-500 stroke-[2] shrink-0" />
-          <span className="text-[9.5px] font-semibold text-slate-700 truncate">
-            {connectedDevice ? connectedDevice.name : 'TV'}
-          </span>
+        <div className="flex items-center gap-1.5 pl-0.5 py-0.5 min-w-0 max-w-[70px] pointer-events-none">
           {connectedDevice?.isConnected && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
           )}
+          <span className="text-[10px] font-semibold text-slate-700 truncate">
+            {connectedDevice ? connectedDevice.name : 'TV'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {/* Power Button */}
           <button
             type="button"
@@ -326,7 +324,7 @@ export function MiniRemote({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             title="TV Power"
-            className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-emerald-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-emerald-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
           >
             <Power className="w-3.5 h-3.5 stroke-[2]" />
           </button>
@@ -341,7 +339,7 @@ export function MiniRemote({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             title="Expand to Full Remote"
-            className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
           >
             <Maximize2 className="w-3.5 h-3.5 stroke-[2]" />
           </button>
@@ -356,7 +354,7 @@ export function MiniRemote({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             title="Close Remote & Exit"
-            className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-rose-100 border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-rose-100 border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
           >
             <X className="w-3.5 h-3.5 stroke-[2]" />
           </button>
