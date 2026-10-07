@@ -58,7 +58,8 @@ export type RemoteAction =
   | 'VOLUME_DOWN'
   | 'MUTE'
   | 'TV_INPUT'
-  | 'PLAY_PAUSE';
+  | 'PLAY_PAUSE'
+  | 'USB_MEDIA';
 
 // TV Brand Metadata & Default Ports
 export const TV_BRAND_CONFIG: Record<
@@ -511,6 +512,7 @@ class UniversalTVClient {
           MUTE: 'VolumeMute',
           TV_INPUT: 'InputTuner',
           PLAY_PAUSE: 'Play',
+          USB_MEDIA: 'InputUSB',
         };
         const rokuKey = rokuKeyMap[action] || 'Select';
         wireProtocol = 'Roku ECP HTTP POST';
@@ -534,6 +536,7 @@ class UniversalTVClient {
           MUTE: 'KEY_MUTE',
           TV_INPUT: 'KEY_SOURCE',
           PLAY_PAUSE: 'KEY_PLAY_BACK',
+          USB_MEDIA: 'KEY_MEDIA',
         };
         const samsungKey = samsungKeyMap[action] || 'KEY_ENTER';
         wireProtocol = 'Samsung Tizen WS (Port 8002)';
@@ -560,6 +563,7 @@ class UniversalTVClient {
           MUTE: 'ssap://audio/setMute',
           TV_INPUT: 'ssap://tv/switchInput',
           PLAY_PAUSE: 'ssap://media.controls/play',
+          USB_MEDIA: 'ssap://system.launcher/open?target=com.webos.app.mediaplayer',
         };
         const lgUri = lgKeyMap[action] || 'ssap://media.controls/ok';
         wireProtocol = 'LG webOS SSAP WS (Port 3001)';
@@ -583,6 +587,7 @@ class UniversalTVClient {
           MUTE: 164,
           TV_INPUT: 178,
           PLAY_PAUSE: 85,
+          USB_MEDIA: 226,
         };
         const keycode = fireKeyMap[action] || 23;
         wireProtocol = 'Fire OS ADB (Port 5555)';
@@ -615,6 +620,7 @@ class UniversalTVClient {
           MUTE: 164,
           TV_INPUT: 178,
           PLAY_PAUSE: 85,
+          USB_MEDIA: 226,
         };
         const keycode = androidKeyMap[action] || 23;
         wireProtocol = 'Android TV Remote v2 (TLS 6467)';

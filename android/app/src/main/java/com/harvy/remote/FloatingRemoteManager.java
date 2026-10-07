@@ -227,7 +227,7 @@ public class FloatingRemoteManager {
         header.addView(title);
 
         // Power Button
-        Button btnPower = createIconButton(ctx, "⏻", Color.parseColor("#10B981"));
+        Button btnPower = createIconButton(ctx, "⏻", Color.parseColor("#334155"));
         btnPower.setOnClickListener(v -> {
             vibrateTap(ctx);
             sendAction("POWER");
@@ -235,7 +235,7 @@ public class FloatingRemoteManager {
         header.addView(btnPower);
 
         // Expand Button (Brings full app to front)
-        Button btnExpand = createIconButton(ctx, "⛶", Color.parseColor("#0284C7"));
+        Button btnExpand = createIconButton(ctx, "⛶", Color.parseColor("#334155"));
         btnExpand.setOnClickListener(v -> {
             vibrateTap(ctx);
             hideFloatingRemote();
@@ -247,7 +247,7 @@ public class FloatingRemoteManager {
         header.addView(btnExpand);
 
         // Close Button
-        Button btnClose = createIconButton(ctx, "✕", Color.parseColor("#E11D48"));
+        Button btnClose = createIconButton(ctx, "✕", Color.parseColor("#334155"));
         btnClose.setOnClickListener(v -> {
             vibrateTap(ctx);
             hideFloatingRemote();
@@ -368,7 +368,7 @@ public class FloatingRemoteManager {
         Button b = new Button(ctx);
         b.setText(text);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        b.setTextColor(Color.parseColor("#1E293B"));
+        b.setTextColor(Color.parseColor("#334155"));
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.parseColor("#E8EDF3"));

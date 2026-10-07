@@ -1716,6 +1716,7 @@ public class NativeTVManager {
             case "MUTE": return 164;
             case "TV_INPUT": return 178;
             case "PLAY_PAUSE": return 85;
+            case "USB_MEDIA": return 226; // KeyEvent.KEYCODE_MEDIA_TOP_MENU
             default: return 23;
         }
     }
@@ -1735,6 +1736,7 @@ public class NativeTVManager {
             case "MUTE": return "VolumeMute";
             case "TV_INPUT": return "InputTuner";
             case "PLAY_PAUSE": return "Play";
+            case "USB_MEDIA": return "InputUSB";
             default: return "Select";
         }
     }
@@ -1754,6 +1756,7 @@ public class NativeTVManager {
             case "MUTE": return "KEY_MUTE";
             case "TV_INPUT": return "KEY_SOURCE";
             case "PLAY_PAUSE": return "KEY_PLAY";
+            case "USB_MEDIA": return "KEY_MEDIA";
             default: return "KEY_ENTER";
         }
     }
@@ -1773,8 +1776,20 @@ public class NativeTVManager {
             case "MUTE": return "ssap://audio/setMute";
             case "TV_INPUT": return "ssap://tv/switchInput";
             case "PLAY_PAUSE": return "ssap://media.controls/play";
+            case "USB_MEDIA": return "ssap://system.launcher/open?target=com.webos.app.mediaplayer";
             default: return "ssap://media.controls/ok";
         }
+    }
+
+    @JavascriptInterface
+    public void openUsbMedia() {
+        commandExecutor.submit(() -> {
+            try {
+                if (activeRemoteIp != null) {
+                    sendGoogleTvKey(activeRemoteIp, 226);
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     private boolean sendSonyIrcc(String ip, String irccCode) {

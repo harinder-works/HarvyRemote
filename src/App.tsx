@@ -344,6 +344,15 @@ export default function App() {
     await universalTV.sendAction('TV_INPUT');
   };
 
+  const handleUsbPress = async () => {
+    sound.playClick('action');
+    await universalTV.sendAction('USB_MEDIA');
+    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    if (bridge && typeof bridge.openUsbMedia === 'function') {
+      bridge.openUsbMedia();
+    }
+  };
+
   const handleVolumeChange = async (delta: number) => {
     if (delta > 0) {
       await universalTV.sendAction('VOLUME_UP');
@@ -525,6 +534,7 @@ export default function App() {
           onMutePress={handleMutePress}
           onPowerPress={handlePowerPress}
           onInputPress={handleInputPress}
+          onUsbPress={handleUsbPress}
           onVolumeChange={handleVolumeChange}
           onSwitchToMini={handleEnterFloating}
           onOpenKeyboard={() => setKeyboardDrawerOpen(true)}

@@ -5,6 +5,7 @@ import {
   VolumeX,
   Power,
   Tv,
+  Usb,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -41,6 +42,7 @@ interface GoogleTVRemoteProps {
   onMutePress: () => void;
   onPowerPress: () => void;
   onInputPress: () => void;
+  onUsbPress?: () => void;
   onVolumeChange: (delta: number) => void;
   onSwitchToMini: () => void;
   onOpenKeyboard: () => void;
@@ -69,6 +71,7 @@ export function GoogleTVRemote({
   onMutePress,
   onPowerPress,
   onInputPress,
+  onUsbPress,
   onVolumeChange,
   onSwitchToMini,
   onOpenKeyboard,
@@ -448,6 +451,17 @@ export function GoogleTVRemote({
     onInputPress();
   };
 
+  const handleUsb = () => {
+    sound.playClick('action');
+    triggerLed('usb');
+    showStatus('Opening USB Media...');
+    if (onUsbPress) {
+      onUsbPress();
+    } else {
+      onInputPress();
+    }
+  };
+
   const handleVolume = (delta: number) => {
     sound.playClick('dpad');
     triggerLed(delta > 0 ? 'vol-up' : 'vol-down');
@@ -596,14 +610,14 @@ export function GoogleTVRemote({
               type="button"
               onClick={onOpenDeviceManager}
               title={connectedDevice ? `Connected to ${connectedDevice.name} (${connectedDevice.ip})` : 'Select / Pair Smart TV'}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-[9px] font-semibold text-slate-700 transition-colors cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-[9.5px] font-semibold text-slate-700 transition-colors cursor-pointer shadow-sm"
             >
               <span
                 className={`w-1.5 h-1.5 shrink-0 rounded-full ${
                   connectedDevice ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                 }`}
               />
-              <span className="truncate max-w-[65px]">
+              <span className="truncate max-w-[68px]">
                 {connectedDevice ? connectedDevice.name : 'Connect TV'}
               </span>
             </button>
@@ -613,9 +627,9 @@ export function GoogleTVRemote({
               data-drag-handle="true"
               onClick={handleResetPosition}
               title="Drag remote anywhere on screen. Tap to re-center."
-              className="p-1 rounded-full hover:bg-black/10 text-slate-400 hover:text-slate-700 transition-colors cursor-grab active:cursor-grabbing"
+              className="p-1 rounded-full hover:bg-black/10 text-slate-500 hover:text-slate-700 transition-colors cursor-grab active:cursor-grabbing"
             >
-              <GripHorizontal className="w-3.5 h-3.5 pointer-events-none" />
+              <GripHorizontal className="w-3.5 h-3.5 stroke-[2] pointer-events-none" />
             </div>
 
             {/* Action Controls: Control Mode, Keyboard, Float/Mini Remote, and Close */}
@@ -628,9 +642,9 @@ export function GoogleTVRemote({
                   setControlMode((m) => (m === 'dpad' ? 'trackpad' : 'dpad'));
                 }}
                 title={controlMode === 'dpad' ? 'Switch to Swipe Trackpad' : 'Switch to D-Pad'}
-                className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shadow-sm flex items-center justify-center"
+                className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer shadow-sm flex items-center justify-center"
               >
-                {controlMode === 'dpad' ? <MousePointer className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />}
+                {controlMode === 'dpad' ? <MousePointer className="w-2.5 h-2.5 stroke-[2]" /> : <ChevronUp className="w-2.5 h-2.5 stroke-[2]" />}
               </button>
 
               {/* Keyboard trigger */}
@@ -641,22 +655,22 @@ export function GoogleTVRemote({
                   onOpenKeyboard();
                 }}
                 title="Keyboard Typing for TV"
-                className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shadow-sm flex items-center justify-center"
+                className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer shadow-sm flex items-center justify-center"
               >
-                <Keyboard className="w-2.5 h-2.5" />
+                <Keyboard className="w-2.5 h-2.5 stroke-[2]" />
               </button>
 
-              {/* Minimize to Mini Remote */}
+              {/* Minimize to Mini Remote / Float */}
               <button
                 type="button"
                 onClick={() => {
                   sound.playClick('action');
                   onSwitchToMini();
                 }}
-                title="Minimize to Mini Remote"
-                className="w-6 h-6 rounded-full bg-sky-100 hover:bg-sky-200 border border-sky-300 text-sky-700 transition-colors cursor-pointer shadow-sm flex items-center justify-center"
+                title="Float over other apps (Mini Remote)"
+                className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer shadow-sm flex items-center justify-center"
               >
-                <Minimize2 className="w-2.5 h-2.5" />
+                <Minimize2 className="w-2.5 h-2.5 stroke-[2]" />
               </button>
 
               {/* Close Button */}
@@ -667,16 +681,16 @@ export function GoogleTVRemote({
                   onCloseApp?.();
                 }}
                 title="Close Remote & Exit"
-                className="w-6 h-6 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 transition-colors cursor-pointer shadow-sm flex items-center justify-center active:scale-95"
+                className="w-6 h-6 rounded-full bg-[#E1E5EA] hover:bg-rose-100 border border-[#D0D5DC] text-slate-700 hover:text-rose-600 transition-colors cursor-pointer shadow-sm flex items-center justify-center active:scale-95"
               >
-                <X className="w-3 h-3 stroke-[2.2]" />
+                <X className="w-3 h-3 stroke-[2]" />
               </button>
             </div>
           </div>
 
       {/* ON-REMOTE TOAST / STATUS FEEDBACK */}
       {onRemoteStatus && (
-        <div className="w-full my-1 px-2 py-0.5 rounded-full bg-sky-500 text-white text-[9px] font-bold text-center shadow-lg animate-in fade-in zoom-in duration-150 truncate">
+        <div className="w-full my-1 px-2 py-0.5 rounded-full bg-slate-800 text-white text-[9px] font-medium text-center shadow-md animate-in fade-in zoom-in duration-150 truncate">
           {onRemoteStatus}
         </div>
       )}
@@ -684,42 +698,43 @@ export function GoogleTVRemote({
       {/* FACE 1: STANDARD FULL REMOTE CONTROLS */}
       {remoteFace === 'controls' && (
         <>
-          {/* 2. TOP HARDWARE ROW: Power, TV Input, Mute */}
+          {/* 2. TOP HARDWARE ROW: Power, USB Media, Mute */}
           <div className="flex items-center gap-1.5 px-0.5 mb-1.5">
             <button
               type="button"
               onClick={handlePower}
               title="TV Power"
-              className="flex-1 h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-emerald-600 hover:text-emerald-700 transition-all active:scale-95 cursor-pointer shadow-sm"
+              className="flex-1 h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-emerald-600 transition-all active:scale-95 cursor-pointer shadow-sm"
             >
-              <Power className="w-3.5 h-3.5 stroke-[2.2]" />
+              <Power className="w-4 h-4 stroke-[2]" />
             </button>
 
+            {/* USB Media Button: Open USB Media & Storage */}
             <button
               type="button"
-              onClick={handleInput}
-              title="TV Input Source"
-              className="flex-1 h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-black transition-all active:scale-95 cursor-pointer shadow-sm"
+              onClick={handleUsb}
+              title="Open USB Media / Storage"
+              className="flex-1 h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-sm"
             >
-              <Tv className="w-3.5 h-3.5 stroke-[2.2]" />
+              <Usb className="w-4 h-4 stroke-[2]" />
             </button>
 
             <button
               type="button"
               onClick={handleMute}
               title="Mute Audio"
-              className="flex-1 h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-black transition-all active:scale-95 cursor-pointer shadow-sm"
+              className="flex-1 h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-sm"
             >
-              <VolumeX className="w-3.5 h-3.5 stroke-[2.2]" />
+              <VolumeX className="w-4 h-4 stroke-[2]" />
             </button>
           </div>
 
           {/* 3. PRIMARY INTERACTION AREA: SEPARATED D-PAD OR SWIPE TRACKPAD */}
           <div className="w-full flex flex-col items-center justify-center my-2">
             {controlMode === 'dpad' ? (
-              /* Ergonomic Separated Directional Controls - Zero Overlap */
+              /* Ergonomic Separated Directional Controls - Broad Horizontal Targets */
               <div className="flex flex-col items-center justify-center select-none py-1">
-                {/* UP KEY (Isolated) */}
+                {/* UP KEY (Horizontally Broad: 108px) */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -727,15 +742,15 @@ export function GoogleTVRemote({
                     handleDpad('up');
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="w-[70px] h-[48px] mb-2 rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  className="w-[108px] h-[48px] mb-2 rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                   title="Navigate Up"
                 >
-                  <ChevronUp className="w-5 h-5 stroke-[1.8]" />
+                  <ChevronUp className="w-6 h-6 stroke-[2]" />
                 </button>
 
-                {/* MIDDLE ROW: LEFT, CENTER OK, RIGHT */}
+                {/* MIDDLE ROW: LEFT (64px), CENTER OK (72px), RIGHT (64px) */}
                 <div className="flex items-center justify-center gap-2.5 my-0.5">
-                  {/* LEFT KEY (Isolated) */}
+                  {/* LEFT KEY (Horizontally Broad: 64px) */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -743,10 +758,10 @@ export function GoogleTVRemote({
                       handleDpad('left');
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="w-[48px] h-[70px] rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                    className="w-[64px] h-[70px] rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                     title="Navigate Left"
                   >
-                    <ChevronLeft className="w-5 h-5 stroke-[1.8]" />
+                    <ChevronLeft className="w-6 h-6 stroke-[2]" />
                   </button>
 
                   {/* CENTER OK BUTTON (Standalone refined disc) */}
@@ -758,12 +773,12 @@ export function GoogleTVRemote({
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
                     title="Select / OK"
-                    className="w-[70px] h-[70px] rounded-full bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-sky-500 active:to-sky-600 active:text-white border border-[#CBD1DB] shadow-[0_3px_8px_rgba(0,0,0,0.09),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-center cursor-pointer text-slate-700 font-semibold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
+                    className="w-[72px] h-[70px] rounded-full bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-slate-200 active:to-slate-300 border border-[#CBD1DB] shadow-[0_3px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-center cursor-pointer text-slate-700 font-semibold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
                   >
                     OK
                   </button>
 
-                  {/* RIGHT KEY (Isolated) */}
+                  {/* RIGHT KEY (Horizontally Broad: 64px) */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -771,14 +786,14 @@ export function GoogleTVRemote({
                       handleDpad('right');
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="w-[48px] h-[70px] rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                    className="w-[64px] h-[70px] rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                     title="Navigate Right"
                   >
-                    <ChevronRight className="w-5 h-5 stroke-[1.8]" />
+                    <ChevronRight className="w-6 h-6 stroke-[2]" />
                   </button>
                 </div>
 
-                {/* DOWN KEY (Isolated) */}
+                {/* DOWN KEY (Horizontally Broad: 108px) */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -786,10 +801,10 @@ export function GoogleTVRemote({
                     handleDpad('down');
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="w-[70px] h-[48px] mt-2 rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-sky-100 active:text-sky-700 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  className="w-[108px] h-[48px] mt-2 rounded-2xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
                   title="Navigate Down"
                 >
-                  <ChevronDown className="w-5 h-5 stroke-[1.8]" />
+                  <ChevronDown className="w-6 h-6 stroke-[2]" />
                 </button>
               </div>
             ) : (
@@ -799,7 +814,7 @@ export function GoogleTVRemote({
                 onPointerUp={handleTrackpadPointerUp}
                 className="w-[190px] h-[184px] rounded-2xl bg-[#DFE3E8] border border-[#CFD4DC] shadow-inner flex flex-col items-center justify-center text-center p-2.5 cursor-pointer touch-none active:bg-[#D5D9DF] transition-colors"
               >
-                <MousePointer className="w-5 h-5 text-sky-600 mb-1 opacity-80" />
+                <MousePointer className="w-5 h-5 text-slate-700 stroke-[2] mb-1 opacity-80" />
                 <span className="text-[10px] font-semibold text-slate-700">Swipe to Navigate</span>
                 <span className="text-[9px] text-slate-500 mt-0.5">Tap to Select</span>
               </div>
@@ -812,9 +827,9 @@ export function GoogleTVRemote({
               type="button"
               onClick={handleBack}
               title="Back"
-              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-black transition-all active:scale-95 cursor-pointer shadow-sm"
+              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-sm"
             >
-              <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
+              <ArrowLeft className="w-4 h-4 stroke-[2]" />
             </button>
 
             <button
@@ -832,9 +847,9 @@ export function GoogleTVRemote({
               type="button"
               onClick={handleHome}
               title="Home"
-              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-black transition-all active:scale-95 cursor-pointer shadow-sm"
+              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-sm"
             >
-              <Home className="w-4 h-4 stroke-[2.2]" />
+              <Home className="w-4 h-4 stroke-[2]" />
             </button>
           </div>
 
@@ -845,7 +860,7 @@ export function GoogleTVRemote({
               type="button"
               onClick={() => handleVolume(-5)}
               title="Volume Down (-)"
-              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-800 text-sm font-bold active:scale-95 cursor-pointer shadow-sm"
+              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 text-sm font-semibold active:scale-95 cursor-pointer shadow-sm"
             >
               −
             </button>
@@ -855,7 +870,7 @@ export function GoogleTVRemote({
               type="button"
               onClick={() => handleVolume(5)}
               title="Volume Up (+)"
-              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-800 text-sm font-bold active:scale-95 cursor-pointer shadow-sm"
+              className="h-9 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 text-sm font-semibold active:scale-95 cursor-pointer shadow-sm"
             >
               +
             </button>
@@ -880,7 +895,7 @@ export function GoogleTVRemote({
               <div style={{ color: shortcut1.brandColor }} className="shrink-0 flex items-center justify-center">
                 <AppIconRenderer iconType={shortcut1.iconType} className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[8px] font-bold truncate text-slate-800 max-w-[28px]">{shortcut1.shortLabel}</span>
+              <span className="text-[8.5px] font-semibold truncate text-slate-700 max-w-[28px]">{shortcut1.shortLabel}</span>
             </button>
 
             {/* Fast Shortcut 2 */}
@@ -903,7 +918,7 @@ export function GoogleTVRemote({
               <div style={{ color: shortcut2.brandColor }} className="shrink-0 flex items-center justify-center">
                 <AppIconRenderer iconType={shortcut2.iconType} className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[8px] font-bold truncate text-slate-800 max-w-[28px]">{shortcut2.shortLabel}</span>
+              <span className="text-[8.5px] font-semibold truncate text-slate-700 max-w-[28px]">{shortcut2.shortLabel}</span>
             </button>
           </div>
 
@@ -912,9 +927,9 @@ export function GoogleTVRemote({
             <button
               type="button"
               onClick={() => setRemoteFace('channels')}
-              className="w-full h-8.5 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center gap-1.5 text-[10.5px] font-semibold text-slate-700 hover:text-black transition-colors cursor-pointer shadow-sm"
+              className="w-full h-8.5 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center gap-1.5 text-[10.5px] font-semibold text-slate-700 hover:text-slate-900 transition-colors cursor-pointer shadow-sm"
             >
-              <Grid className="w-3.5 h-3.5 text-slate-500" />
+              <Grid className="w-3.5 h-3.5 stroke-[2] text-slate-700" />
               <span>All Channels & Apps</span>
             </button>
           </div>
