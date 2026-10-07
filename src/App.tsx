@@ -17,8 +17,7 @@ import {
   SmartTVDevice,
   UniversalCommandLog,
 } from './utils/universalTVProtocol';
-import { GoogleDots, AppIconRenderer } from './components/BrandIcons';
-import { Layers, Tv } from 'lucide-react';
+import { GoogleDots } from './components/BrandIcons';
 
 export default function App() {
   // Always the classic white (Snow) Google TV remote
@@ -478,80 +477,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="w-full min-h-screen select-none bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D] overflow-hidden pointer-events-none">
-      {/* Top Multi-tasking Bar: Allows floating over other apps & parallel usage */}
-      {!isAppClosed && (
-        <div className="fixed top-3 left-4 right-4 z-40 pointer-events-auto flex items-center justify-between">
-          {/* Connected Device Pill */}
-          <button
-            type="button"
-            onClick={() => setDeviceModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-white/15 shadow-md text-[11px] font-semibold cursor-pointer active:scale-95 transition-all"
-          >
-            <Tv className="w-3.5 h-3.5 text-sky-400" />
-            <span className="truncate max-w-[90px]">
-              {connectedDevice ? connectedDevice.name : 'Connect TV'}
-            </span>
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                connectedDevice ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-              }`}
-            />
-          </button>
-
-          {/* Float over Apps / Parallel Mode button */}
-          <button
-            type="button"
-            onClick={handleEnterFloating}
-            title="Float over other apps on your screen (Use apps in parallel)"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-lg text-[11px] font-bold cursor-pointer active:scale-95 transition-all"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Float over Apps</span>
-          </button>
-        </div>
-      )}
-
-      {/* Floating Permission Helper Banner (When overlay permission is required) */}
-      {!isAppClosed && !hasOverlayPermission && (
-        <div className="fixed top-14 left-4 right-4 z-40 pointer-events-auto bg-sky-950/80 border border-sky-400/40 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-sky-100">
-          <div className="text-xs">
-            <span className="font-bold text-sky-300 block">Multitask & Float Over Apps</span>
-            <span className="text-[11px] text-slate-300">Allow overlay permission to keep remote on screen while using other apps.</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleEnterFloating}
-            className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shrink-0 cursor-pointer shadow-md active:scale-95 transition-all"
-          >
-            Enable
-          </button>
-        </div>
-      )}
-
-      {/* Bottom TV Apps Quick Shelf: Visible and interactive so screen is never blank */}
-      {!isAppClosed && remoteMode === 'full' && (
-        <div className="fixed bottom-3 left-4 right-4 z-30 pointer-events-auto flex items-center gap-2 overflow-x-auto no-scrollbar py-1.5 px-3 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-xl">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 pl-1">
-            TV Apps:
-          </span>
-          {installedApps.slice(0, 8).map((app) => (
-            <button
-              key={app.id}
-              type="button"
-              onClick={() => handleLaunchApp(app)}
-              title={`Launch ${app.name} on TV`}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium shrink-0 transition-all active:scale-95 cursor-pointer"
-            >
-              <div style={{ color: app.brandColor }} className="shrink-0">
-                <AppIconRenderer iconType={app.iconType} className="w-3.5 h-3.5" />
-              </div>
-              <span className="truncate max-w-[65px]">{app.shortLabel}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
+    <div className="w-full min-h-screen select-none bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D] overflow-hidden flex items-center justify-center">
       {/* Voice Search Floating Toast */}
       {isVoiceActive && !isAppClosed && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto px-5 py-3 rounded-2xl bg-white/95 text-slate-800 border border-slate-300 shadow-2xl flex items-center gap-3 backdrop-blur-md animate-in fade-in slide-in-from-top-3">
@@ -566,7 +492,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating Restore Pill (When remote is closed in browser preview) */}
+      {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">
           <button
@@ -583,7 +509,7 @@ export default function App() {
         </div>
       )}
 
-      {/* FULL REMOTE MODE: Freely draggable anywhere on screen */}
+      {/* FULL REMOTE MODE: All controls are embedded cleanly inside the remote pebble */}
       {remoteMode === 'full' && !isAppClosed && (
         <GoogleTVRemote
           theme={theme}
@@ -614,10 +540,7 @@ export default function App() {
         />
       )}
 
-      {/* 
-        MINI REMOTE MODE:
-        Draggable white mini remote floating freely with transparent background passthrough!
-      */}
+      {/* MINI REMOTE MODE: Ultra-sleek compact widget */}
       {remoteMode === 'mini' && !isAppClosed && (
         <MiniRemote
           isOpen={true}
@@ -639,7 +562,7 @@ export default function App() {
         />
       )}
 
-      {/* MODALS: Mount on-demand only when opened to keep DOM and memory minimal */}
+      {/* MODALS */}
       {deviceModalOpen && (
         <div className="pointer-events-auto">
           <DeviceManagerModal
