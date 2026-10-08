@@ -8,7 +8,6 @@ import React, { useState, useEffect } from 'react';
 import { GoogleTVRemote } from './components/GoogleTVRemote';
 import { MiniRemote } from './components/MiniRemote';
 import { DeviceManagerModal } from './components/DeviceManagerModal';
-import { FloatingPermissionModal } from './components/FloatingPermissionModal';
 import { AppShortcut, RemoteTheme } from './types/remote';
 import { sound } from './utils/audio';
 import {
@@ -29,17 +28,6 @@ export default function App() {
 
   const [isPip, setIsPip] = useState(false);
   const [isAppClosed, setIsAppClosed] = useState(false);
-  const [showFloatingSetupModal, setShowFloatingSetupModal] = useState(false);
-  const [hasOverlayPermission, setHasOverlayPermission] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hasOverlayPermission) {
-      try {
-        return Boolean((window as any).AndroidNativeBridge.hasOverlayPermission());
-      } catch {
-        return true;
-      }
-    }
-    return true;
-  });
 
   const handleCloseApp = () => {
     sound.playClick('soft');
@@ -62,7 +50,7 @@ export default function App() {
     }
   };
 
-  // Listen for native Android Picture-in-Picture & Overlay permission events
+  // Listen for native Android Picture-in-Picture events
   useEffect(() => {
     const handlePip = (e: any) => {
       const pipActive = Boolean(e.detail?.isPip);
@@ -74,81 +62,34 @@ export default function App() {
       }
     };
 
-    const handleOverlayStatus = (e: any) => {
-      if (typeof e.detail?.granted === 'boolean') {
-        setHasOverlayPermission(e.detail.granted);
-        if (e.detail.granted) {
-          setShowFloatingSetupModal(false);
-        }
-      }
-    };
-
     window.addEventListener('pip-mode-changed', handlePip);
-    window.addEventListener('overlay-permission-status', handleOverlayStatus);
     return () => {
       window.removeEventListener('pip-mode-changed', handlePip);
-      window.removeEventListener('overlay-permission-status', handleOverlayStatus);
     };
   }, []);
 
-  const handleEnterFloating = () => {
-    sound.playClick('action');
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hasOverlayPermission) {
-      const hasPerm = Boolean((window as any).AndroidNativeBridge.hasOverlayPermission());
-      if (!hasPerm) {
-        setHasOverlayPermission(false);
-        setShowFloatingSetupModal(true);
-        return;
-      }
-    }
-    setRemoteMode('mini');
-    setIsPip(false);
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.startFloatingRemote) {
-      try {
-        (window as any).AndroidNativeBridge.startFloatingRemote();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  };
-
+  // Enter Picture-in-Picture mode by default
   const handleEnterPip = () => {
     sound.playClick('action');
-    setShowFloatingSetupModal(false);
+    setRemoteMode('mini');
+    setIsPip(true);
     if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
       try {
         (window as any).AndroidNativeBridge.enterPip();
-        return;
       } catch (e) {
-        console.error(e);
+        console.error('Android enterPip error:', e);
       }
     }
-    setRemoteMode('mini');
   };
 
-  const handleOpenAppInfo = () => {
-    sound.playClick('action');
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.openAppDetailsSettings) {
-      (window as any).AndroidNativeBridge.openAppDetailsSettings();
-    } else if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.requestOverlayPermission) {
-      (window as any).AndroidNativeBridge.requestOverlayPermission();
-    }
-  };
-
-  const handleOpenOverlaySettings = () => {
-    sound.playClick('action');
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.requestOverlayPermission) {
-      (window as any).AndroidNativeBridge.requestOverlayPermission();
-    }
-  };
-
-  const handleExitFloating = () => {
+  // Exit Picture-in-Picture and expand to Full Remote
+  const handleExitPip = () => {
     sound.playClick('action');
     setRemoteMode('full');
     setIsPip(false);
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hideFloatingRemote) {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.exitPip) {
       try {
-        (window as any).AndroidNativeBridge.hideFloatingRemote();
+        (window as any).AndroidNativeBridge.exitPip();
       } catch (e) {
         console.error(e);
       }
@@ -330,15 +271,6 @@ export default function App() {
 
   return (
     <div className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center">
-      {/* Floating Permission Modal */}
-      <FloatingPermissionModal
-        isOpen={showFloatingSetupModal}
-        onClose={() => setShowFloatingSetupModal(false)}
-        onEnterPip={handleEnterPip}
-        onOpenAppInfo={handleOpenAppInfo}
-        onOpenOverlaySettings={handleOpenOverlaySettings}
-      />
-
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">
@@ -370,20 +302,20 @@ export default function App() {
           onInputPress={handleInputPress}
           onUsbPress={handleUsbPress}
           onVolumeChange={handleVolumeChange}
-          onSwitchToMini={handleEnterFloating}
+          onSwitchToMini={handleEnterPip}
           onOpenDeviceManager={() => setDeviceModalOpen(true)}
           onCloseApp={handleCloseApp}
           connectedDevice={connectedDevice}
         />
       )}
 
-      {/* MINI REMOTE MODE: Ultra-sleek compact widget */}
+      {/* MINI REMOTE MODE / PICTURE-IN-PICTURE */}
       {remoteMode === 'mini' && !isAppClosed && (
         <MiniRemote
           isOpen={true}
           theme={theme}
-          isPip={false}
-          onExpand={handleExitFloating}
+          isPip={isPip}
+          onExpand={handleExitPip}
           onDpadPress={handleDpadPress}
           onSelectPress={handleSelectPress}
           onBackPress={handleBackPress}
