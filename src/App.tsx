@@ -297,7 +297,41 @@ export default function App() {
   }, []);
 
   return (
-    <div className="relative w-full min-h-screen select-none bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D] overflow-hidden flex items-center justify-center">
+    <div
+      onClick={(e) => {
+        // If clicking on transparent backdrop outside the remote pebble, minimize activity so underlying app gets focus
+        const target = e.target as HTMLElement;
+        if (!target.closest('.remote-draggable-container') && !target.closest('button')) {
+          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.moveTaskToBack) {
+            (window as any).AndroidNativeBridge.moveTaskToBack();
+          }
+        }
+      }}
+      className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center"
+    >
+      {/* Floating Permission Banner (If Android overlay permission is not yet granted) */}
+      {!hasOverlayPermission && (
+        <div className="fixed top-3 inset-x-3 z-50 flex items-center justify-center pointer-events-auto animate-in slide-in-from-top duration-200">
+          <div className="max-w-md w-full bg-slate-900/95 border border-sky-400/40 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-white backdrop-blur-md">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-sky-400">Float over other apps</span>
+              <span className="text-[10.5px] text-slate-300">Allow "Display over other apps" to see wallpaper and use other apps simultaneously</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                sound.playClick('action');
+                if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.requestOverlayPermission) {
+                  (window as any).AndroidNativeBridge.requestOverlayPermission();
+                }
+              }}
+              className="shrink-0 px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              Enable
+            </button>
+          </div>
+        </div>
+      )}
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">

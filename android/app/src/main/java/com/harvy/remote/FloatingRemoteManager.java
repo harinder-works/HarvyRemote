@@ -7,7 +7,6 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.VibrationEffect;
@@ -31,6 +30,7 @@ public class FloatingRemoteManager {
     private NativeTVManager tvManager;
     private Activity activity;
     private boolean isShowing = false;
+    private boolean isFullMode = true;
 
     private String currentBrand = "google_tv";
     private String currentIp = "192.168.1.105";
@@ -51,13 +51,14 @@ public class FloatingRemoteManager {
         this.tvManager = tvManager;
         this.windowManager = (WindowManager) activity.getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
 
-        // Restore saved device credentials if available
+        // Restore saved device credentials & mode preferences
         try {
             SharedPreferences sp = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             this.currentBrand = sp.getString("brand", this.currentBrand);
             this.currentIp = sp.getString("ip", this.currentIp);
             this.currentPort = sp.getInt("port", this.currentPort);
             this.currentDeviceName = sp.getString("name", this.currentDeviceName);
+            this.isFullMode = sp.getBoolean("is_full_mode", true);
         } catch (Exception ignored) {}
     }
 
@@ -118,7 +119,7 @@ public class FloatingRemoteManager {
         }
 
         if (isShowing && floatingView != null) {
-            // Already showing, just push Activity to background so user sees home screen & other apps
+            // Already showing, send Activity to background so user can see & use other apps
             activity.runOnUiThread(() -> {
                 try {
                     activity.moveTaskToBack(true);
@@ -136,6 +137,14 @@ public class FloatingRemoteManager {
                     layoutType = WindowManager.LayoutParams.TYPE_PHONE;
                 }
 
+                int savedX = dpToPx(16);
+                int savedY = dpToPx(80);
+                try {
+                    SharedPreferences sp = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                    savedX = sp.getInt("pos_x", savedX);
+                    savedY = sp.getInt("pos_y", savedY);
+                } catch (Exception ignored) {}
+
                 windowParams = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.WRAP_CONTENT,
@@ -145,14 +154,14 @@ public class FloatingRemoteManager {
                 );
 
                 windowParams.gravity = Gravity.TOP | Gravity.START;
-                windowParams.x = dpToPx(16);
-                windowParams.y = dpToPx(120);
+                windowParams.x = savedX;
+                windowParams.y = savedY;
 
                 floatingView = createFloatingView();
                 windowManager.addView(floatingView, windowParams);
                 isShowing = true;
 
-                // Move Activity to back so user's home screen & other apps become visible and interactive
+                // Move Activity to back so user sees their wallpaper and can use other apps underneath
                 activity.moveTaskToBack(true);
             } catch (Exception ignored) {}
         });
@@ -171,6 +180,28 @@ public class FloatingRemoteManager {
         });
     }
 
+    public synchronized void toggleMode() {
+        isFullMode = !isFullMode;
+        try {
+            if (activity != null) {
+                SharedPreferences sp = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                sp.edit().putBoolean("is_full_mode", isFullMode).apply();
+            }
+        } catch (Exception ignored) {}
+
+        if (activity != null && isShowing && windowManager != null) {
+            activity.runOnUiThread(() -> {
+                try {
+                    if (floatingView != null) {
+                        windowManager.removeView(floatingView);
+                    }
+                    floatingView = createFloatingView();
+                    windowManager.addView(floatingView, windowParams);
+                } catch (Exception ignored) {}
+            });
+        }
+    }
+
     public boolean isFloatingShowing() {
         return isShowing;
     }
@@ -178,213 +209,27 @@ public class FloatingRemoteManager {
     private View createFloatingView() {
         Context ctx = activity.getApplicationContext();
 
-        // Container card: 156dp wide compact pebble
+        int cardWidthDp = isFullMode ? 240 : 156;
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
         int pad = dpToPx(8);
         card.setPadding(pad, dpToPx(6), pad, pad);
-        card.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(156), LinearLayout.LayoutParams.WRAP_CONTENT));
+        card.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(cardWidthDp), LinearLayout.LayoutParams.WRAP_CONTENT));
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.parseColor("#FAFBFD"));
         bg.setCornerRadius(dpToPx(24));
-        bg.setStroke(dpToPx(1.5f), Color.parseColor("#CFD4DC"));
+        bg.setStroke(dpToPx(1.5f), Color.parseColor("#CBD5E1"));
         card.setBackground(bg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            card.setElevation(dpToPx(8));
+            card.setElevation(dpToPx(12));
         }
 
-        // Top drag indicator bar
-        LinearLayout gripBar = new LinearLayout(ctx);
-        gripBar.setOrientation(LinearLayout.HORIZONTAL);
-        gripBar.setGravity(Gravity.CENTER);
-        gripBar.setPadding(0, 0, 0, dpToPx(4));
-
-        View pill = new View(ctx);
-        GradientDrawable pillBg = new GradientDrawable();
-        pillBg.setColor(Color.parseColor("#94A3B8"));
-        pillBg.setCornerRadius(dpToPx(2));
-        pill.setBackground(pillBg);
-        LinearLayout.LayoutParams pillLp = new LinearLayout.LayoutParams(dpToPx(28), dpToPx(3.5f));
-        pill.setLayoutParams(pillLp);
-        gripBar.addView(pill);
-        card.addView(gripBar);
-
-        // Header Row: Drag handle & Title, Power, Expand, Close
-        LinearLayout header = new LinearLayout(ctx);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dpToPx(2), 0, dpToPx(2), dpToPx(4));
-
-        TextView title = new TextView(ctx);
-        title.setId(101);
-        title.setText(currentDeviceName);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
-        title.setTextColor(Color.parseColor("#334155"));
-        title.setSingleLine(true);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-        title.setLayoutParams(titleLp);
-        header.addView(title);
-
-        // Power Button
-        Button btnPower = createIconButton(ctx, "⏻", Color.parseColor("#334155"));
-        btnPower.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("POWER");
-        });
-        header.addView(btnPower);
-
-        // Expand Button (Brings full app to front)
-        Button btnExpand = createIconButton(ctx, "⛶", Color.parseColor("#334155"));
-        btnExpand.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            hideFloatingRemote();
-            Intent intent = new Intent(activity, MainActivity.class);
-            intent.putExtra("LAUNCH_MODE", "EXPAND");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            activity.startActivity(intent);
-        });
-        header.addView(btnExpand);
-
-        // Close Button
-        Button btnClose = createIconButton(ctx, "✕", Color.parseColor("#334155"));
-        btnClose.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            hideFloatingRemote();
-        });
-        header.addView(btnClose);
-
-        card.addView(header);
-
-        // DIRECTIONAL CLUSTER
-        // Up Key
-        Button btnUp = createActionButton(ctx, "▲");
-        LinearLayout.LayoutParams upLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32));
-        upLp.setMargins(0, dpToPx(2), 0, dpToPx(2));
-        btnUp.setLayoutParams(upLp);
-        btnUp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        btnUp.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("DPAD_UP");
-        });
-        card.addView(btnUp);
-
-        // Middle Row: Left, OK, Right
-        LinearLayout midRow = new LinearLayout(ctx);
-        midRow.setOrientation(LinearLayout.HORIZONTAL);
-        midRow.setWeightSum(3.0f);
-
-        Button btnLeft = createActionButton(ctx, "◀");
-        btnLeft.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        btnLeft.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("DPAD_LEFT");
-        });
-        midRow.addView(btnLeft);
-
-        Button btnOk = new Button(ctx);
-        btnOk.setText("OK");
-        btnOk.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        btnOk.setTextColor(Color.parseColor("#0F172A"));
-        btnOk.setAllCaps(false);
-
-        GradientDrawable okBg = new GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[]{ Color.parseColor("#FFFFFF"), Color.parseColor("#E2E8F0") }
-        );
-        okBg.setCornerRadius(dpToPx(12));
-        okBg.setStroke(dpToPx(1.2f), Color.parseColor("#CBD5E1"));
-        btnOk.setBackground(okBg);
-
-        LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(0, dpToPx(38), 1.0f);
-        okLp.setMargins(dpToPx(1.5f), 0, dpToPx(1.5f), 0);
-        btnOk.setLayoutParams(okLp);
-        btnOk.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("SELECT");
-        });
-        midRow.addView(btnOk);
-
-        Button btnRight = createActionButton(ctx, "▶");
-        btnRight.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        btnRight.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("DPAD_RIGHT");
-        });
-        midRow.addView(btnRight);
-
-        card.addView(midRow);
-
-        // Down Key
-        Button btnDown = createActionButton(ctx, "▼");
-        LinearLayout.LayoutParams downLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32));
-        downLp.setMargins(0, dpToPx(2), 0, dpToPx(4));
-        btnDown.setLayoutParams(downLp);
-        btnDown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        btnDown.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("DPAD_DOWN");
-        });
-        card.addView(btnDown);
-
-        // Navigation Row: Back & Home
-        LinearLayout navRow = new LinearLayout(ctx);
-        navRow.setOrientation(LinearLayout.HORIZONTAL);
-        navRow.setWeightSum(2.0f);
-
-        Button btnBack = createActionButton(ctx, "⮌ Back");
-        btnBack.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-        btnBack.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("BACK");
-        });
-        navRow.addView(btnBack);
-
-        Button btnHome = createActionButton(ctx, "⌂ Home");
-        btnHome.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-        btnHome.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("HOME");
-        });
-        navRow.addView(btnHome);
-
-        LinearLayout.LayoutParams navLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        navLp.setMargins(0, 0, 0, dpToPx(4));
-        navRow.setLayoutParams(navLp);
-        card.addView(navRow);
-
-        // Volume Row: [-] [Mute] [+]
-        LinearLayout volRow = new LinearLayout(ctx);
-        volRow.setOrientation(LinearLayout.HORIZONTAL);
-        volRow.setWeightSum(3.0f);
-
-        Button btnVolDown = createActionButton(ctx, "−");
-        btnVolDown.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("VOLUME_DOWN");
-        });
-        volRow.addView(btnVolDown);
-
-        Button btnMute = createActionButton(ctx, "🔇");
-        btnMute.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("MUTE");
-        });
-        volRow.addView(btnMute);
-
-        Button btnVolUp = createActionButton(ctx, "+");
-        btnVolUp.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            sendAction("VOLUME_UP");
-        });
-        volRow.addView(btnVolUp);
-
-        card.addView(volRow);
-
-        // Setup Drag Handling on the gripBar and header
+        // Setup Drag Handling
         View.OnTouchListener dragListener = new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
+            private boolean isDragging = false;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -394,10 +239,14 @@ public class FloatingRemoteManager {
                         initialY = windowParams.y;
                         initialTouchX = event.getRawX();
                         initialTouchY = event.getRawY();
+                        isDragging = false;
                         return true;
                     case MotionEvent.ACTION_MOVE:
                         int dx = (int) (event.getRawX() - initialTouchX);
                         int dy = (int) (event.getRawY() - initialTouchY);
+                        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                            isDragging = true;
+                        }
                         windowParams.x = initialX + dx;
                         windowParams.y = initialY + dy;
                         if (windowManager != null && floatingView != null) {
@@ -407,48 +256,449 @@ public class FloatingRemoteManager {
                         }
                         return true;
                     case MotionEvent.ACTION_UP:
+                        if (isDragging && activity != null) {
+                            try {
+                                SharedPreferences sp = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                                sp.edit().putInt("pos_x", windowParams.x).putInt("pos_y", windowParams.y).apply();
+                            } catch (Exception ignored) {}
+                        }
                         return true;
                 }
                 return false;
             }
         };
 
+        // Top drag indicator bar
+        LinearLayout gripBar = new LinearLayout(ctx);
+        gripBar.setOrientation(LinearLayout.HORIZONTAL);
+        gripBar.setGravity(Gravity.CENTER);
+        gripBar.setPadding(0, 0, 0, dpToPx(3));
+
+        View pill = new View(ctx);
+        GradientDrawable pillBg = new GradientDrawable();
+        pillBg.setColor(Color.parseColor("#94A3B8"));
+        pillBg.setCornerRadius(dpToPx(2));
+        pill.setBackground(pillBg);
+        LinearLayout.LayoutParams pillLp = new LinearLayout.LayoutParams(dpToPx(28), dpToPx(3.5f));
+        pill.setLayoutParams(pillLp);
+        gripBar.addView(pill);
         gripBar.setOnTouchListener(dragListener);
+        card.addView(gripBar);
+
+        // Header Row: TV name status dot, Mode Toggle, Close
+        LinearLayout header = new LinearLayout(ctx);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dpToPx(2), 0, dpToPx(2), dpToPx(4));
+
+        View dot = new View(ctx);
+        GradientDrawable dotBg = new GradientDrawable();
+        dotBg.setColor(Color.parseColor("#10B981"));
+        dotBg.setShape(GradientDrawable.OVAL);
+        dot.setBackground(dotBg);
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dpToPx(7), dpToPx(7));
+        dotLp.setMargins(0, 0, dpToPx(4), 0);
+        dot.setLayoutParams(dotLp);
+        header.addView(dot);
+
+        TextView title = new TextView(ctx);
+        title.setId(101);
+        title.setText(currentDeviceName);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, isFullMode ? 11 : 9.5f);
+        title.setTextColor(Color.parseColor("#1E293B"));
+        title.setSingleLine(true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        title.setLayoutParams(titleLp);
         title.setOnTouchListener(dragListener);
+        header.addView(title);
+
+        // Mode switch button: switches between Full Remote and Mini Remote
+        Button btnToggle = createIconButton(ctx, isFullMode ? "🗕 Mini" : "⛶ Full", Color.parseColor("#475569"), isFullMode ? dpToPx(48) : dpToPx(44));
+        btnToggle.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            toggleMode();
+        });
+        header.addView(btnToggle);
+
+        // Close Button
+        Button btnClose = createIconButton(ctx, "✕", Color.parseColor("#475569"), dpToPx(24));
+        btnClose.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            hideFloatingRemote();
+        });
+        header.addView(btnClose);
+
+        card.addView(header);
+
+        if (isFullMode) {
+            // FULL REMOTE MODE
+            // 1. Hardware Row: Power, USB Media, Mute
+            LinearLayout hwRow = new LinearLayout(ctx);
+            hwRow.setOrientation(LinearLayout.HORIZONTAL);
+            hwRow.setWeightSum(3.0f);
+            hwRow.setPadding(0, 0, 0, dpToPx(4));
+
+            Button btnPower = createActionButton(ctx, "⏻", 13, Color.parseColor("#0F172A"));
+            btnPower.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("POWER");
+            });
+            hwRow.addView(btnPower);
+
+            Button btnUsb = createActionButton(ctx, "🖴 USB", 10.5f, Color.parseColor("#0F172A"));
+            btnUsb.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("USB_MEDIA");
+            });
+            hwRow.addView(btnUsb);
+
+            Button btnMute = createActionButton(ctx, "🔇", 13, Color.parseColor("#0F172A"));
+            btnMute.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("MUTE");
+            });
+            hwRow.addView(btnMute);
+
+            card.addView(hwRow);
+
+            // 2. SEPARATED DIRECTIONAL CONTROLS (Standalone independent buttons)
+            LinearLayout dpadContainer = new LinearLayout(ctx);
+            dpadContainer.setOrientation(LinearLayout.VERTICAL);
+            dpadContainer.setGravity(Gravity.CENTER_HORIZONTAL);
+            dpadContainer.setPadding(0, dpToPx(2), 0, dpToPx(3));
+
+            // Up Button
+            Button btnUp = createDirectionalButton(ctx, "▲");
+            btnUp.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_UP");
+            });
+            dpadContainer.addView(btnUp);
+
+            // Middle Row: Left, Center OK, Right
+            LinearLayout midRow = new LinearLayout(ctx);
+            midRow.setOrientation(LinearLayout.HORIZONTAL);
+            midRow.setGravity(Gravity.CENTER_VERTICAL);
+            midRow.setPadding(0, dpToPx(3), 0, dpToPx(3));
+
+            Button btnLeft = createDirectionalButton(ctx, "◀");
+            btnLeft.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_LEFT");
+            });
+            midRow.addView(btnLeft);
+
+            Button btnOk = createOkButton(ctx);
+            btnOk.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("SELECT");
+            });
+            midRow.addView(btnOk);
+
+            Button btnRight = createDirectionalButton(ctx, "▶");
+            btnRight.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_RIGHT");
+            });
+            midRow.addView(btnRight);
+
+            dpadContainer.addView(midRow);
+
+            // Down Button
+            Button btnDown = createDirectionalButton(ctx, "▼");
+            btnDown.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_DOWN");
+            });
+            dpadContainer.addView(btnDown);
+
+            card.addView(dpadContainer);
+
+            // 3. Navigation Row: Back & Home
+            LinearLayout navRow = new LinearLayout(ctx);
+            navRow.setOrientation(LinearLayout.HORIZONTAL);
+            navRow.setWeightSum(2.0f);
+            navRow.setPadding(0, 0, 0, dpToPx(3));
+
+            Button btnBack = createActionButton(ctx, "⮌ Back", 10.5f, Color.parseColor("#1E293B"));
+            btnBack.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("BACK");
+            });
+            navRow.addView(btnBack);
+
+            Button btnHome = createActionButton(ctx, "⌂ Home", 10.5f, Color.parseColor("#1E293B"));
+            btnHome.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("HOME");
+            });
+            navRow.addView(btnHome);
+
+            card.addView(navRow);
+
+            // 4. Volume Row: Vol − & Vol +
+            LinearLayout volRow = new LinearLayout(ctx);
+            volRow.setOrientation(LinearLayout.HORIZONTAL);
+            volRow.setWeightSum(2.0f);
+            volRow.setPadding(0, 0, 0, dpToPx(4));
+
+            Button btnVolDown = createActionButton(ctx, "−  VOL", 10.5f, Color.parseColor("#1E293B"));
+            btnVolDown.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("VOLUME_DOWN");
+            });
+            volRow.addView(btnVolDown);
+
+            Button btnVolUp = createActionButton(ctx, "VOL  +", 10.5f, Color.parseColor("#1E293B"));
+            btnVolUp.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("VOLUME_UP");
+            });
+            volRow.addView(btnVolUp);
+
+            card.addView(volRow);
+
+            // 5. Six Streaming App Shortcuts (2 columns x 3 rows)
+            LinearLayout appRow1 = createStreamingAppRow(ctx, "YouTube", Color.parseColor("#DC2626"), "youtube", "Netflix", Color.parseColor("#E50914"), "netflix");
+            card.addView(appRow1);
+
+            LinearLayout appRow2 = createStreamingAppRow(ctx, "Hotstar", Color.parseColor("#1D4ED8"), "hotstar", "Prime Video", Color.parseColor("#0284C7"), "prime");
+            card.addView(appRow2);
+
+            LinearLayout appRow3 = createStreamingAppRow(ctx, "JioCinema", Color.parseColor("#D946EF"), "jiocinema", "Sony LIV", Color.parseColor("#2563EB"), "sonyliv");
+            card.addView(appRow3);
+
+        } else {
+            // MINI REMOTE MODE
+            Button btnPower = createActionButton(ctx, "⏻ Power", 11, Color.parseColor("#0F172A"));
+            LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32));
+            pLp.setMargins(0, 0, 0, dpToPx(3));
+            btnPower.setLayoutParams(pLp);
+            btnPower.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("POWER");
+            });
+            card.addView(btnPower);
+
+            // Separated D-Pad
+            Button btnUp = createDirectionalButton(ctx, "▲");
+            btnUp.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_UP");
+            });
+            card.addView(btnUp);
+
+            LinearLayout midRow = new LinearLayout(ctx);
+            midRow.setOrientation(LinearLayout.HORIZONTAL);
+            midRow.setGravity(Gravity.CENTER_VERTICAL);
+            midRow.setPadding(0, dpToPx(2), 0, dpToPx(2));
+
+            Button btnLeft = createDirectionalButton(ctx, "◀");
+            btnLeft.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_LEFT");
+            });
+            midRow.addView(btnLeft);
+
+            Button btnOk = createOkButton(ctx);
+            btnOk.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("SELECT");
+            });
+            midRow.addView(btnOk);
+
+            Button btnRight = createDirectionalButton(ctx, "▶");
+            btnRight.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_RIGHT");
+            });
+            midRow.addView(btnRight);
+
+            card.addView(midRow);
+
+            Button btnDown = createDirectionalButton(ctx, "▼");
+            btnDown.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("DPAD_DOWN");
+            });
+            card.addView(btnDown);
+
+            // Nav Row
+            LinearLayout navRow = new LinearLayout(ctx);
+            navRow.setOrientation(LinearLayout.HORIZONTAL);
+            navRow.setWeightSum(2.0f);
+            navRow.setPadding(0, dpToPx(2), 0, dpToPx(2));
+
+            Button btnBack = createActionButton(ctx, "⮌", 12, Color.parseColor("#1E293B"));
+            btnBack.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("BACK");
+            });
+            navRow.addView(btnBack);
+
+            Button btnHome = createActionButton(ctx, "⌂", 12, Color.parseColor("#1E293B"));
+            btnHome.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("HOME");
+            });
+            navRow.addView(btnHome);
+
+            card.addView(navRow);
+
+            // Vol Row
+            LinearLayout volRow = new LinearLayout(ctx);
+            volRow.setOrientation(LinearLayout.HORIZONTAL);
+            volRow.setWeightSum(3.0f);
+            volRow.setPadding(0, 0, 0, dpToPx(2));
+
+            Button btnVolDown = createActionButton(ctx, "−", 14, Color.parseColor("#1E293B"));
+            btnVolDown.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("VOLUME_DOWN");
+            });
+            volRow.addView(btnVolDown);
+
+            Button btnMute = createActionButton(ctx, "🔇", 11, Color.parseColor("#1E293B"));
+            btnMute.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("MUTE");
+            });
+            volRow.addView(btnMute);
+
+            Button btnVolUp = createActionButton(ctx, "+", 14, Color.parseColor("#1E293B"));
+            btnVolUp.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("VOLUME_UP");
+            });
+            volRow.addView(btnVolUp);
+
+            card.addView(volRow);
+        }
 
         return card;
     }
 
-    private Button createIconButton(Context ctx, String text, int color) {
+    private Button createDirectionalButton(Context ctx, String text) {
         Button b = new Button(ctx);
         b.setText(text);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        b.setTextColor(color);
-        b.setBackgroundColor(Color.TRANSPARENT);
-        b.setPadding(0, 0, 0, 0);
-        b.setMinimumWidth(dpToPx(24));
-        b.setMinimumHeight(dpToPx(24));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dpToPx(24), dpToPx(24));
-        lp.setMargins(dpToPx(1.5f), 0, 0, 0);
-        b.setLayoutParams(lp);
-        return b;
-    }
-
-    private Button createActionButton(Context ctx, String text) {
-        Button b = new Button(ctx);
-        b.setText(text);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        b.setTextColor(Color.parseColor("#334155"));
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        b.setTextColor(Color.parseColor("#1E293B"));
 
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.parseColor("#E8EDF3"));
+        bg.setColor(Color.parseColor("#E2E8F0"));
         bg.setCornerRadius(dpToPx(12));
         bg.setStroke(dpToPx(1), Color.parseColor("#CBD5E1"));
         b.setBackground(bg);
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dpToPx(38), 1.0f);
+        int w = isFullMode ? dpToPx(70) : dpToPx(44);
+        int h = isFullMode ? dpToPx(36) : dpToPx(32);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
+        lp.setMargins(dpToPx(1.5f), dpToPx(1), dpToPx(1.5f), dpToPx(1));
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private Button createOkButton(Context ctx) {
+        Button b = new Button(ctx);
+        b.setText("OK");
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        b.setTextColor(Color.parseColor("#0F172A"));
+        b.setAllCaps(false);
+
+        GradientDrawable bg = new GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{ Color.parseColor("#FFFFFF"), Color.parseColor("#E2E8F0") }
+        );
+        bg.setCornerRadius(dpToPx(12));
+        bg.setStroke(dpToPx(1.2f), Color.parseColor("#94A3B8"));
+        b.setBackground(bg);
+
+        int w = isFullMode ? dpToPx(70) : dpToPx(44);
+        int h = isFullMode ? dpToPx(36) : dpToPx(32);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
+        lp.setMargins(dpToPx(1.5f), dpToPx(1), dpToPx(1.5f), dpToPx(1));
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private Button createActionButton(Context ctx, String text, float textSizeSp, int textColor) {
+        Button b = new Button(ctx);
+        b.setText(text);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp);
+        b.setTextColor(textColor);
+        b.setAllCaps(false);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#E2E8F0"));
+        bg.setCornerRadius(dpToPx(12));
+        bg.setStroke(dpToPx(1), Color.parseColor("#CBD5E1"));
+        b.setBackground(bg);
+
+        int h = isFullMode ? dpToPx(35) : dpToPx(32);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, h, 1.0f);
+        lp.setMargins(dpToPx(1.5f), dpToPx(1), dpToPx(1.5f), dpToPx(1));
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private Button createIconButton(Context ctx, String text, int color, int widthPx) {
+        Button b = new Button(ctx);
+        b.setText(text);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f);
+        b.setTextColor(color);
+        b.setAllCaps(false);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#E2E8F0"));
+        bg.setCornerRadius(dpToPx(8));
+        bg.setStroke(dpToPx(0.8f), Color.parseColor("#CBD5E1"));
+        b.setBackground(bg);
+        b.setPadding(dpToPx(4), 0, dpToPx(4), 0);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(widthPx, dpToPx(24));
+        lp.setMargins(dpToPx(2), 0, 0, 0);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private LinearLayout createStreamingAppRow(Context ctx, String app1Name, int app1Color, String app1Slug, String app2Name, int app2Color, String app2Slug) {
+        LinearLayout row = new LinearLayout(ctx);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setWeightSum(2.0f);
+        row.setPadding(0, 0, 0, dpToPx(2.5f));
+
+        Button b1 = createStreamingAppButton(ctx, app1Name, app1Color, app1Slug);
+        row.addView(b1);
+
+        Button b2 = createStreamingAppButton(ctx, app2Name, app2Color, app2Slug);
+        row.addView(b2);
+
+        return row;
+    }
+
+    private Button createStreamingAppButton(Context ctx, String appName, int brandColor, String appSlug) {
+        Button b = new Button(ctx);
+        b.setText(appName);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        b.setTextColor(Color.parseColor("#0F172A"));
+        b.setAllCaps(false);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#FFFFFF"));
+        bg.setCornerRadius(dpToPx(11));
+        bg.setStroke(dpToPx(1), Color.parseColor("#CBD5E1"));
+        b.setBackground(bg);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dpToPx(34), 1.0f);
         lp.setMargins(dpToPx(1.5f), 0, dpToPx(1.5f), 0);
         b.setLayoutParams(lp);
+
+        b.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            if (tvManager != null) {
+                tvManager.launchApp(currentBrand, currentIp, currentPort, appSlug);
+            }
+        });
         return b;
     }
 

@@ -35,14 +35,16 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
-            // Solid dark background for full remote mode (never translucent wallpaper)
-            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
-            getWindow().getDecorView().setFitsSystemWindows(true);
+            // Transparent background so wallpaper & background apps are visible
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setNavigationBarColor(Color.TRANSPARENT);
+            getWindow().getDecorView().setFitsSystemWindows(false);
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
-                webView.setFitsSystemWindows(true);
-                webView.setBackgroundColor(Color.parseColor("#0B0F19"));
+                webView.setFitsSystemWindows(false);
+                webView.setBackgroundColor(Color.TRANSPARENT);
 
                 // Hardware compositing layer for 60/120fps UI
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -166,6 +168,15 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
+                    public void moveTaskToBack() {
+                        runOnUiThread(() -> {
+                            try {
+                                MainActivity.this.moveTaskToBack(true);
+                            } catch (Exception ignored) {}
+                        });
+                    }
+
+                    @JavascriptInterface
                     public void closeApp() {
                         runOnUiThread(() -> {
                             try {
@@ -195,19 +206,24 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         if (floatingManager != null) {
+            boolean hasPermission = floatingManager.canDrawOverlays();
             WebView webView = getBridge().getWebView();
             if (webView != null) {
-                boolean hasPermission = floatingManager.canDrawOverlays();
                 webView.evaluateJavascript(
                     "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: " + hasPermission + " } }));",
                     null
                 );
             }
 
-            // If user launches app normally (not expanded from floating remote) and overlay permission is granted:
-            // automatically show the floating remote and minimize activity so they can use other apps in parallel!
-            if (!isLaunchedFromExpand && floatingManager.canDrawOverlays()) {
-                floatingManager.showFloatingRemote();
+            // If user launches app normally (not expanded from floating remote):
+            // If overlay permission is granted, immediately show the floating remote and minimize activity so they can use other apps!
+            // If not granted, prompt overlay permission so it can float over other apps!
+            if (!isLaunchedFromExpand) {
+                if (hasPermission) {
+                    floatingManager.showFloatingRemote();
+                } else {
+                    floatingManager.requestOverlayPermission();
+                }
             }
         }
     }
