@@ -148,6 +148,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: 'com.hulu.livingroomplus' },
     max: { appId: 'com.wbd.stream' },
     crunchyroll: { appId: 'com.crunchyroll.crunchyroid' },
+    jiocinema: { appId: 'com.jio.media.ondemand' },
+    sonyliv: { appId: 'com.sonyliv' },
   },
   samsung: {
     youtube: { appId: '111299001912' },
@@ -161,6 +163,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: '3201601007230' },
     max: { appId: '3201601007625' },
     crunchyroll: { appId: '3202110025345' },
+    jiocinema: { appId: '3201907018808' },
+    sonyliv: { appId: '3201807016598' },
   },
   lg_webos: {
     youtube: { appId: 'youtube.leanback.v4' },
@@ -174,6 +178,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: 'hulu' },
     max: { appId: 'com.wbd.stream' },
     crunchyroll: { appId: 'com.crunchyroll.cr-webos' },
+    jiocinema: { appId: 'com.jio.media.ondemand' },
+    sonyliv: { appId: 'com.sonyliv' },
   },
   roku: {
     youtube: { appId: '837' },
@@ -187,6 +193,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: '2285' },
     max: { appId: '61322' },
     crunchyroll: { appId: '247' },
+    jiocinema: { appId: '716298' },
+    sonyliv: { appId: '542617' },
   },
   fire_tv: {
     youtube: { appId: 'com.amazon.firetv.youtube' },
@@ -200,6 +208,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: 'com.hulu.plus' },
     max: { appId: 'com.wbd.stream' },
     crunchyroll: { appId: 'com.crunchyroll.crunchyroid' },
+    jiocinema: { appId: 'com.jio.media.ondemand' },
+    sonyliv: { appId: 'com.sonyliv' },
   },
   vizio: {
     youtube: { appId: 'youtube' },
@@ -213,6 +223,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: 'hulu' },
     max: { appId: 'max' },
     crunchyroll: { appId: 'crunchyroll' },
+    jiocinema: { appId: 'jiocinema' },
+    sonyliv: { appId: 'sonyliv' },
   },
   universal: {
     youtube: { appId: 'YouTube' },
@@ -226,6 +238,8 @@ export const BRAND_APP_MAPPINGS: Record<
     hulu: { appId: 'Hulu' },
     max: { appId: 'Max' },
     crunchyroll: { appId: 'Crunchyroll' },
+    jiocinema: { appId: 'JioCinema' },
+    sonyliv: { appId: 'SonyLIV' },
   },
 };
 

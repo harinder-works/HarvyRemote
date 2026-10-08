@@ -4,20 +4,17 @@
  * Zero external clutter, zero outside buttons, completely seamless.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GoogleTVRemote } from './components/GoogleTVRemote';
 import { MiniRemote } from './components/MiniRemote';
 import { DeviceManagerModal } from './components/DeviceManagerModal';
-import { TVKeyboardDrawer } from './components/TVKeyboardDrawer';
-import { AppShortcut, PRESET_APPS, RemoteTheme } from './types/remote';
+import { AppShortcut, RemoteTheme } from './types/remote';
 import { sound } from './utils/audio';
-import { createSpeechRecognizer, parseVoiceCommand } from './utils/speech';
 import {
   universalTV,
   SmartTVDevice,
   UniversalCommandLog,
 } from './utils/universalTVProtocol';
-import { GoogleDots } from './components/BrandIcons';
 
 export default function App() {
   // Always the classic white (Snow) Google TV remote
@@ -145,135 +142,11 @@ export default function App() {
     return null;
   });
 
-  // Customizable Hardware App Shortcut 1 & 2 (Key 1 & Key 2)
-  const [shortcut1, setShortcut1] = useState<AppShortcut>(() => {
-    const saved = localStorage.getItem('gtv_shortcut_1');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // ignore
-      }
-    }
-    return PRESET_APPS[0]; // YouTube
-  });
-
-  const [shortcut2, setShortcut2] = useState<AppShortcut>(() => {
-    const saved = localStorage.getItem('gtv_shortcut_2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // ignore
-      }
-    }
-    return PRESET_APPS[1]; // Netflix
-  });
-
-  // Installed TV apps (synced from TV and persisted)
-  const [installedApps, setInstalledApps] = useState<AppShortcut[]>(() => {
-    try {
-      const saved = localStorage.getItem('gtv_installed_apps');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return PRESET_APPS;
-  });
-
-  const [isSyncingApps, setIsSyncingApps] = useState(false);
-
-  // Sync apps listener from UniversalTVClient / NativeTVManager
-  useEffect(() => {
-    const unsubscribe = universalTV.onInstalledApps((apps) => {
-      if (Array.isArray(apps) && apps.length > 0) {
-        const normalized: AppShortcut[] = apps.map((a: any) => {
-          const id = a.id || a.appId || a.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const existing = PRESET_APPS.find((p) => p.id === id);
-          return {
-            id,
-            name: a.name || id,
-            shortLabel: a.shortLabel || a.name || id,
-            iconType: (a.iconType || existing?.iconType || 'custom') as any,
-            brandColor: a.brandColor || existing?.brandColor || '#38bdf8',
-            textColor: a.textColor || '#FFFFFF',
-            category: a.category || existing?.category || 'Streaming',
-            tagline: a.tagline || existing?.tagline || `Launch ${a.name || id} on TV`,
-            heroColor: a.heroColor || existing?.heroColor || 'from-slate-900 via-slate-950 to-black',
-          };
-        });
-
-        setInstalledApps(normalized);
-        setIsSyncingApps(false);
-        try {
-          localStorage.setItem('gtv_installed_apps', JSON.stringify(normalized));
-        } catch {}
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
-  // Auto-fetch TV apps when connected device is available & sync with floating remote
-  useEffect(() => {
-    if (connectedDevice?.ip) {
-      universalTV.fetchInstalledApps(connectedDevice.brand, connectedDevice.ip, connectedDevice.port);
-      if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.updateFloatingDeviceInfo) {
-        try {
-          (window as any).AndroidNativeBridge.updateFloatingDeviceInfo(
-            connectedDevice.brand,
-            connectedDevice.ip,
-            connectedDevice.port,
-            connectedDevice.name
-          );
-        } catch {}
-      }
-    }
-  }, [connectedDevice]);
-
-  const handleSyncApps = () => {
-    setIsSyncingApps(true);
-    sound.playClick('action');
-    universalTV.fetchInstalledApps();
-    setTimeout(() => setIsSyncingApps(false), 3000);
-  };
-
-  const handleAddCustomApp = (newApp: AppShortcut) => {
-    sound.playClick('button');
-    setInstalledApps((prev) => {
-      const updated = [newApp, ...prev.filter((a) => a.id !== newApp.id)];
-      try {
-        localStorage.setItem('gtv_installed_apps', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-  };
-
-  const handleDeleteApp = (appId: string) => {
-    sound.playClick('soft');
-    setInstalledApps((prev) => {
-      const updated = prev.filter((a) => a.id !== appId);
-      try {
-        localStorage.setItem('gtv_installed_apps', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-  };
-
-  // Embedded remote features (TV Pairing & Keyboard input)
+  // Embedded remote features (TV Pairing Modal)
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
-  const [keyboardDrawerOpen, setKeyboardDrawerOpen] = useState(false);
 
   // Command logs & telemetry
   const [commandLogs, setCommandLogs] = useState<UniversalCommandLog[]>([]);
-
-  // Voice Search State
-  const [isVoiceActive, setIsVoiceActive] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState('');
-  const speechRecognizerRef = useRef<ReturnType<typeof createSpeechRecognizer> | null>(null);
 
   // Sync remote mode and update native window bounds
   useEffect(() => {
@@ -296,22 +169,21 @@ export default function App() {
     return unsubscribe;
   }, [deviceModalOpen]);
 
-  // Listen for remote app launch events
+  // Auto-fetch TV apps when connected device is available & sync with floating remote
   useEffect(() => {
-    const handleLaunch = (e: CustomEvent<AppShortcut>) => {
-      handleLaunchApp(e.detail);
-    };
-    window.addEventListener('remote-launch-app' as any, handleLaunch);
-    return () => window.removeEventListener('remote-launch-app' as any, handleLaunch);
+    if (connectedDevice?.ip) {
+      if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.updateFloatingDeviceInfo) {
+        try {
+          (window as any).AndroidNativeBridge.updateFloatingDeviceInfo(
+            connectedDevice.brand,
+            connectedDevice.ip,
+            connectedDevice.port,
+            connectedDevice.name
+          );
+        } catch {}
+      }
+    }
   }, [connectedDevice]);
-
-  // Save shortcut assignments
-  const handleSaveShortcuts = (s1: AppShortcut, s2: AppShortcut) => {
-    setShortcut1(s1);
-    setShortcut2(s2);
-    localStorage.setItem('gtv_shortcut_1', JSON.stringify(s1));
-    localStorage.setItem('gtv_shortcut_2', JSON.stringify(s2));
-  };
 
   // Remote keypress handlers (Universal for all smart TVs)
   const handleDpadPress = async (direction: 'up' | 'down' | 'left' | 'right') => {
@@ -347,9 +219,13 @@ export default function App() {
   const handleUsbPress = async () => {
     sound.playClick('action');
     await universalTV.sendAction('USB_MEDIA');
-    const bridge = (window as any).NativeTVManager || (window as any).AndroidNativeBridge;
+    const bridge = (window as any).NativeTVManager;
     if (bridge && typeof bridge.openUsbMedia === 'function') {
-      bridge.openUsbMedia();
+      try {
+        bridge.openUsbMedia();
+      } catch (e) {
+        console.error('Bridge USB media error:', e);
+      }
     }
   };
 
@@ -369,57 +245,6 @@ export default function App() {
     sound.playClick('action');
     await universalTV.launchApp(app.id);
   };
-
-  const handleSendText = async (text: string) => {
-    await universalTV.sendTextInput(text);
-  };
-
-  // Voice Search / Google Assistant
-  const handleVoicePress = () => {
-    sound.playAssistantChime();
-    setIsVoiceActive(true);
-    setVoiceTranscript('');
-
-    try {
-      if (speechRecognizerRef.current) {
-        speechRecognizerRef.current.abort();
-      }
-
-      const recognizer = createSpeechRecognizer(
-        () => {},
-        (interim) => {
-          setVoiceTranscript(interim);
-        },
-        async (finalText) => {
-          setVoiceTranscript(finalText);
-          sound.playAssistantEnd();
-          const parsed = parseVoiceCommand(finalText);
-
-          if (parsed.action === 'open_app' && parsed.targetApp) {
-            await universalTV.launchApp(parsed.targetApp);
-          } else {
-            await universalTV.sendVoiceSearch(finalText);
-          }
-
-          setTimeout(() => {
-            setIsVoiceActive(false);
-          }, 1500);
-        },
-        () => {
-          setIsVoiceActive(false);
-        },
-        () => {}
-      );
-
-      if (recognizer) {
-        speechRecognizerRef.current = recognizer;
-        recognizer.start();
-      }
-    } catch {
-      // fallback
-    }
-  };
-
 
   // Keyboard navigation
   useEffect(() => {
@@ -445,28 +270,14 @@ export default function App() {
           handleDpadPress('right');
           break;
         case 'Enter':
+        case ' ':
           e.preventDefault();
           handleSelectPress();
           break;
-        case 'Backspace':
         case 'Escape':
+        case 'Backspace':
           e.preventDefault();
           handleBackPress();
-          break;
-        case 'h':
-        case 'H':
-          e.preventDefault();
-          handleHomePress();
-          break;
-        case 'm':
-        case 'M':
-          e.preventDefault();
-          handleMutePress();
-          break;
-        case 'v':
-        case 'V':
-          e.preventDefault();
-          handleVoicePress();
           break;
         case '+':
         case '=':
@@ -486,21 +297,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="w-full min-h-screen select-none bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D] overflow-hidden flex items-center justify-center">
-      {/* Voice Search Floating Toast */}
-      {isVoiceActive && !isAppClosed && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto px-5 py-3 rounded-2xl bg-white/95 text-slate-800 border border-slate-300 shadow-2xl flex items-center gap-3 backdrop-blur-md animate-in fade-in slide-in-from-top-3">
-          <GoogleDots className="w-6 h-6" active={true} />
-          <div className="text-xs font-semibold">
-            {voiceTranscript ? (
-              <span className="text-slate-900 font-bold">&ldquo;{voiceTranscript}&rdquo;</span>
-            ) : (
-              <span className="text-sky-600 animate-pulse">Listening... Speak command</span>
-            )}
-          </div>
-        </div>
-      )}
-
+    <div className="relative w-full min-h-screen select-none bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D] overflow-hidden flex items-center justify-center">
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">
@@ -522,31 +319,20 @@ export default function App() {
       {remoteMode === 'full' && !isAppClosed && (
         <GoogleTVRemote
           theme={theme}
-          shortcut1={shortcut1}
-          shortcut2={shortcut2}
-          onUpdateShortcuts={handleSaveShortcuts}
           onLaunchApp={handleLaunchApp}
           onDpadPress={handleDpadPress}
           onSelectPress={handleSelectPress}
           onBackPress={handleBackPress}
           onHomePress={handleHomePress}
-          onVoicePress={handleVoicePress}
           onMutePress={handleMutePress}
           onPowerPress={handlePowerPress}
           onInputPress={handleInputPress}
           onUsbPress={handleUsbPress}
           onVolumeChange={handleVolumeChange}
           onSwitchToMini={handleEnterFloating}
-          onOpenKeyboard={() => setKeyboardDrawerOpen(true)}
           onOpenDeviceManager={() => setDeviceModalOpen(true)}
           onCloseApp={handleCloseApp}
-          isListening={isVoiceActive}
           connectedDevice={connectedDevice}
-          installedApps={installedApps}
-          onSyncApps={handleSyncApps}
-          onAddCustomApp={handleAddCustomApp}
-          onDeleteApp={handleDeleteApp}
-          isSyncingApps={isSyncingApps}
         />
       )}
 
@@ -561,12 +347,11 @@ export default function App() {
           onSelectPress={handleSelectPress}
           onBackPress={handleBackPress}
           onHomePress={handleHomePress}
-          onVoicePress={handleVoicePress}
+          onVoicePress={() => {}}
           onMutePress={handleMutePress}
           onPowerPress={handlePowerPress}
           onVolumeChange={handleVolumeChange}
           onCloseApp={handleCloseApp}
-          isListening={isVoiceActive}
           isTVOn={true}
           connectedDevice={connectedDevice}
         />
@@ -574,23 +359,13 @@ export default function App() {
 
       {/* MODALS */}
       {deviceModalOpen && (
-        <div className="pointer-events-auto">
+        <div className="relative z-50 pointer-events-auto">
           <DeviceManagerModal
             isOpen={true}
             onClose={() => setDeviceModalOpen(false)}
             activeDevice={connectedDevice}
             onDeviceChange={setConnectedDevice}
             commandLogs={commandLogs}
-          />
-        </div>
-      )}
-
-      {keyboardDrawerOpen && (
-        <div className="pointer-events-auto">
-          <TVKeyboardDrawer
-            isOpen={true}
-            onClose={() => setKeyboardDrawerOpen(false)}
-            onSendText={handleSendText}
           />
         </div>
       )}

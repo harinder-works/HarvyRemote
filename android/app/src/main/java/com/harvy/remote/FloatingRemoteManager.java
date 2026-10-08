@@ -178,16 +178,16 @@ public class FloatingRemoteManager {
     private View createFloatingView() {
         Context ctx = activity.getApplicationContext();
 
-        // Container card: 148dp wide compact pebble
+        // Container card: 156dp wide compact pebble
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
         int pad = dpToPx(8);
         card.setPadding(pad, dpToPx(6), pad, pad);
-        card.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(148), LinearLayout.LayoutParams.WRAP_CONTENT));
+        card.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(156), LinearLayout.LayoutParams.WRAP_CONTENT));
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.parseColor("#FAFBFD"));
-        bg.setCornerRadius(dpToPx(22));
+        bg.setCornerRadius(dpToPx(24));
         bg.setStroke(dpToPx(1.5f), Color.parseColor("#CFD4DC"));
         card.setBackground(bg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -214,7 +214,7 @@ public class FloatingRemoteManager {
         LinearLayout header = new LinearLayout(ctx);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dpToPx(2), 0, dpToPx(2), dpToPx(6));
+        header.setPadding(dpToPx(2), 0, dpToPx(2), dpToPx(4));
 
         TextView title = new TextView(ctx);
         title.setId(101);
@@ -256,9 +256,34 @@ public class FloatingRemoteManager {
 
         card.addView(header);
 
-        // Center OK / Play-Pause Button
+        // DIRECTIONAL CLUSTER
+        // Up Key
+        Button btnUp = createActionButton(ctx, "▲");
+        LinearLayout.LayoutParams upLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32));
+        upLp.setMargins(0, dpToPx(2), 0, dpToPx(2));
+        btnUp.setLayoutParams(upLp);
+        btnUp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        btnUp.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            sendAction("DPAD_UP");
+        });
+        card.addView(btnUp);
+
+        // Middle Row: Left, OK, Right
+        LinearLayout midRow = new LinearLayout(ctx);
+        midRow.setOrientation(LinearLayout.HORIZONTAL);
+        midRow.setWeightSum(3.0f);
+
+        Button btnLeft = createActionButton(ctx, "◀");
+        btnLeft.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        btnLeft.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            sendAction("DPAD_LEFT");
+        });
+        midRow.addView(btnLeft);
+
         Button btnOk = new Button(ctx);
-        btnOk.setText("OK / ⏯");
+        btnOk.setText("OK");
         btnOk.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         btnOk.setTextColor(Color.parseColor("#0F172A"));
         btnOk.setAllCaps(false);
@@ -267,21 +292,66 @@ public class FloatingRemoteManager {
             GradientDrawable.Orientation.TOP_BOTTOM,
             new int[]{ Color.parseColor("#FFFFFF"), Color.parseColor("#E2E8F0") }
         );
-        okBg.setCornerRadius(dpToPx(14));
+        okBg.setCornerRadius(dpToPx(12));
         okBg.setStroke(dpToPx(1.2f), Color.parseColor("#CBD5E1"));
         btnOk.setBackground(okBg);
 
-        LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dpToPx(42)
-        );
-        okLp.setMargins(0, 0, 0, dpToPx(6));
+        LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(0, dpToPx(38), 1.0f);
+        okLp.setMargins(dpToPx(1.5f), 0, dpToPx(1.5f), 0);
         btnOk.setLayoutParams(okLp);
         btnOk.setOnClickListener(v -> {
             vibrateTap(ctx);
             sendAction("SELECT");
         });
-        card.addView(btnOk);
+        midRow.addView(btnOk);
+
+        Button btnRight = createActionButton(ctx, "▶");
+        btnRight.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        btnRight.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            sendAction("DPAD_RIGHT");
+        });
+        midRow.addView(btnRight);
+
+        card.addView(midRow);
+
+        // Down Key
+        Button btnDown = createActionButton(ctx, "▼");
+        LinearLayout.LayoutParams downLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32));
+        downLp.setMargins(0, dpToPx(2), 0, dpToPx(4));
+        btnDown.setLayoutParams(downLp);
+        btnDown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        btnDown.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            sendAction("DPAD_DOWN");
+        });
+        card.addView(btnDown);
+
+        // Navigation Row: Back & Home
+        LinearLayout navRow = new LinearLayout(ctx);
+        navRow.setOrientation(LinearLayout.HORIZONTAL);
+        navRow.setWeightSum(2.0f);
+
+        Button btnBack = createActionButton(ctx, "⮌ Back");
+        btnBack.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        btnBack.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            sendAction("BACK");
+        });
+        navRow.addView(btnBack);
+
+        Button btnHome = createActionButton(ctx, "⌂ Home");
+        btnHome.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        btnHome.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            sendAction("HOME");
+        });
+        navRow.addView(btnHome);
+
+        LinearLayout.LayoutParams navLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        navLp.setMargins(0, 0, 0, dpToPx(4));
+        navRow.setLayoutParams(navLp);
+        card.addView(navRow);
 
         // Volume Row: [-] [Mute] [+]
         LinearLayout volRow = new LinearLayout(ctx);

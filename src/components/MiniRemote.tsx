@@ -20,12 +20,12 @@ interface MiniRemoteProps {
   onSelectPress: () => void;
   onBackPress: () => void;
   onHomePress: () => void;
-  onVoicePress: () => void;
+  onVoicePress?: () => void;
   onMutePress: () => void;
   onPowerPress: () => void;
   onVolumeChange: (delta: number) => void;
   onCloseApp?: () => void;
-  isListening: boolean;
+  isListening?: boolean;
   isTVOn: boolean;
   connectedDevice?: SmartTVDevice | null;
 }
