@@ -101,12 +101,31 @@ public class FloatingRemoteManager {
 
     public void requestOverlayPermission() {
         if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(activity)) {
-            Intent intent = new Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + activity.getPackageName())
-            );
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            activity.startActivity(intent);
+            try {
+                Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + activity.getPackageName())
+                );
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(intent);
+            } catch (Exception e) {
+                try {
+                    Intent fallback = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(fallback);
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    public void openAppDetailsSettings() {
+        if (activity != null) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.parse("package:" + activity.getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(intent);
+            } catch (Exception ignored) {}
         }
     }
 

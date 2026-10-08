@@ -1,9 +1,13 @@
 package com.harvy.remote;
 
+import android.app.PictureInPictureParams;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Rational;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -69,7 +73,20 @@ public class MainActivity extends BridgeActivity {
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enterPip() {
-                        startFloatingRemote();
+                        runOnUiThread(() -> {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                try {
+                                    PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+                                    Rational aspectRatio = new Rational(9, 16);
+                                    builder.setAspectRatio(aspectRatio);
+                                    enterPictureInPictureMode(builder.build());
+                                } catch (Exception e) {
+                                    startFloatingRemote();
+                                }
+                            } else {
+                                startFloatingRemote();
+                            }
+                        });
                     }
 
                     @JavascriptInterface
@@ -79,7 +96,17 @@ public class MainActivity extends BridgeActivity {
 
                     @JavascriptInterface
                     public boolean isPipSupported() {
-                        return true;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            return getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE);
+                        }
+                        return false;
+                    }
+
+                    @JavascriptInterface
+                    public void openAppDetailsSettings() {
+                        if (floatingManager != null) {
+                            floatingManager.openAppDetailsSettings();
+                        }
                     }
 
                     @JavascriptInterface
@@ -203,6 +230,18 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        WebView webView = getBridge().getWebView();
+        if (webView != null) {
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('pip-mode-changed', { detail: { isPip: " + isInPictureInPictureMode + " } }));",
+                null
+            );
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         if (floatingManager != null) {
@@ -213,17 +252,6 @@ public class MainActivity extends BridgeActivity {
                     "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: " + hasPermission + " } }));",
                     null
                 );
-            }
-
-            // If user launches app normally (not expanded from floating remote):
-            // If overlay permission is granted, immediately show the floating remote and minimize activity so they can use other apps!
-            // If not granted, prompt overlay permission so it can float over other apps!
-            if (!isLaunchedFromExpand) {
-                if (hasPermission) {
-                    floatingManager.showFloatingRemote();
-                } else {
-                    floatingManager.requestOverlayPermission();
-                }
             }
         }
     }
