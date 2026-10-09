@@ -268,7 +268,29 @@ export default function App() {
   }, []);
 
   return (
-    <div className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center">
+    <div
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.remote-draggable-container') && !target.closest('button')) {
+          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.moveTaskToBack) {
+            try {
+              (window as any).AndroidNativeBridge.moveTaskToBack();
+            } catch {}
+          }
+        }
+      }}
+      onTouchStart={(e) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.remote-draggable-container') && !target.closest('button')) {
+          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.moveTaskToBack) {
+            try {
+              (window as any).AndroidNativeBridge.moveTaskToBack();
+            } catch {}
+          }
+        }
+      }}
+      className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center"
+    >
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">

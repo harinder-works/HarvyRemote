@@ -8,6 +8,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Rational;
+import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -44,6 +46,12 @@ public class MainActivity extends BridgeActivity {
             getWindow().setStatusBarColor(Color.TRANSPARENT);
             getWindow().setNavigationBarColor(Color.TRANSPARENT);
             getWindow().getDecorView().setFitsSystemWindows(false);
+
+            // Allow touch events outside the remote window to pass directly to underlying apps & home screen
+            getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+            );
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
@@ -191,6 +199,27 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
+                    public void setWindowBounds(int widthDp, int heightDp, int xDp, int yDp) {
+                        runOnUiThread(() -> {
+                            try {
+                                float density = getResources().getDisplayMetrics().density;
+                                WindowManager.LayoutParams params = getWindow().getAttributes();
+                                params.width = widthDp > 0 ? (int)(widthDp * density) : WindowManager.LayoutParams.MATCH_PARENT;
+                                params.height = heightDp > 0 ? (int)(heightDp * density) : WindowManager.LayoutParams.MATCH_PARENT;
+                                if (xDp >= 0 && yDp >= 0) {
+                                    params.gravity = Gravity.TOP | Gravity.START;
+                                    params.x = (int)(xDp * density);
+                                    params.y = (int)(yDp * density);
+                                } else {
+                                    params.gravity = Gravity.CENTER;
+                                }
+                                params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+                                getWindow().setAttributes(params);
+                            } catch (Exception ignored) {}
+                        });
+                    }
+
+                    @JavascriptInterface
                     public void closeApp() {
                         runOnUiThread(() -> {
                             try {
@@ -241,6 +270,16 @@ public class MainActivity extends BridgeActivity {
                 );
             }
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
+            // User touched outside the remote on an underlying app or home screen
+            moveTaskToBack(true);
+            return false;
+        }
+        return super.onTouchEvent(event);
     }
 
     @Override

@@ -526,6 +526,44 @@ public class NativeTVManager {
         return false;
     }
 
+    private boolean sendGoogleTvAppLink(String ip, String appLink) {
+        if (appLink == null || appLink.isEmpty()) return false;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                SSLSocket socket = getOrCreateRemoteSocket(ip);
+                if (socket == null) {
+                    return false;
+                }
+                OutputStream os = socket.getOutputStream();
+                byte[] msg = buildRemoteAppLinkLaunchMessage(appLink);
+                sendLengthPrefixed(os, msg);
+                return true;
+            } catch (Exception e) {
+                Log.w(TAG, "sendGoogleTvAppLink failed on attempt " + attempt + ", resetting socket: " + e.getMessage());
+                try {
+                    if (activeRemoteSocket != null) activeRemoteSocket.close();
+                } catch (Exception ex) {}
+                activeRemoteSocket = null;
+            }
+        }
+        return false;
+    }
+
+    private byte[] buildRemoteAppLinkLaunchMessage(String appLink) throws IOException {
+        ByteArrayOutputStream inner = new ByteArrayOutputStream();
+        inner.write(0x0A); // field 1: app_link string
+        byte[] linkBytes = appLink.getBytes(StandardCharsets.UTF_8);
+        writeVarint(inner, linkBytes.length);
+        inner.write(linkBytes);
+        byte[] innerBytes = inner.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x5A); // field 11: remote_app_link_launch ((11 << 3) | 2 = 90 = 0x5A)
+        writeVarint(outer, innerBytes.length);
+        outer.write(innerBytes);
+        return outer.toByteArray();
+    }
+
     // =========================================================================
     // PROTOBUF SERIALIZATION HELPERS
     // =========================================================================
@@ -1409,72 +1447,242 @@ public class NativeTVManager {
     public void launchApp(String brand, String ip, int port, String appSlug) {
         commandExecutor.submit(() -> {
             boolean success = false;
+            String protocolInfo = "";
             try {
                 if ("roku".equalsIgnoreCase(brand)) {
                     String appId = appSlug;
                     if ("netflix".equalsIgnoreCase(appSlug)) appId = "12";
                     else if ("prime".equalsIgnoreCase(appSlug)) appId = "13";
                     else if ("youtube".equalsIgnoreCase(appSlug)) appId = "837";
-                    else if ("disney".equalsIgnoreCase(appSlug)) appId = "291097";
+                    else if ("disney".equalsIgnoreCase(appSlug) || "hotstar".equalsIgnoreCase(appSlug)) appId = "291097";
                     else if ("hulu".equalsIgnoreCase(appSlug)) appId = "2285";
                     else if ("spotify".equalsIgnoreCase(appSlug)) appId = "22271";
                     else if ("apple".equalsIgnoreCase(appSlug)) appId = "551012";
                     else if ("crunchyroll".equalsIgnoreCase(appSlug)) appId = "247";
+                    else if ("jiocinema".equalsIgnoreCase(appSlug)) appId = "716298";
+                    else if ("sonyliv".equalsIgnoreCase(appSlug)) appId = "542617";
 
                     success = httpPost("http://" + ip + ":8060/launch/" + appId, null, 2500);
-                } else if ("google_tv".equalsIgnoreCase(brand) || "android_tv".equalsIgnoreCase(brand) || "fire_tv".equalsIgnoreCase(brand)) {
-                    String pkg = appSlug;
-                    if ("youtube".equalsIgnoreCase(appSlug)) pkg = "com.google.android.youtube.tv";
-                    else if ("netflix".equalsIgnoreCase(appSlug)) pkg = "com.netflix.ninja";
-                    else if ("prime".equalsIgnoreCase(appSlug)) pkg = "com.amazon.amazonvideo.livingroom";
-                    else if ("disney".equalsIgnoreCase(appSlug) || "hotstar".equalsIgnoreCase(appSlug)) pkg = "com.disney.disneyplus";
-                    else if ("spotify".equalsIgnoreCase(appSlug)) pkg = "com.spotify.tv.android";
-                    else if ("apple".equalsIgnoreCase(appSlug)) pkg = "com.apple.atve.androidtv.appletv";
-                    else if ("plex".equalsIgnoreCase(appSlug)) pkg = "com.plexapp.android";
-                    else if ("kodi".equalsIgnoreCase(appSlug)) pkg = "org.xbmc.kodi";
-                    else if ("smarttube".equalsIgnoreCase(appSlug)) pkg = "com.teamsmart.videomanager.tv";
-                    else if ("tivimate".equalsIgnoreCase(appSlug)) pkg = "ar.tvplayer.tv";
-                    else if ("vlc".equalsIgnoreCase(appSlug)) pkg = "org.videolan.vlc";
-                    else if ("twitch".equalsIgnoreCase(appSlug)) pkg = "tv.twitch.android.app";
-                    else if ("crunchyroll".equalsIgnoreCase(appSlug)) pkg = "com.crunchyroll.crunchyroid";
-                    else if ("hulu".equalsIgnoreCase(appSlug)) pkg = "com.hulu.plus";
-                    else if ("max".equalsIgnoreCase(appSlug)) pkg = "com.wbd.stream";
+                    protocolInfo = "Roku ECP (App ID " + appId + ")";
+                } else if ("google_tv".equalsIgnoreCase(brand) || "android_tv".equalsIgnoreCase(brand) || "fire_tv".equalsIgnoreCase(brand) || brand == null || brand.isEmpty()) {
+                    String appLink = getGoogleTvAppLink(appSlug);
 
-                    // Try ADB launch if port 5555 is enabled
-                    if (isPortOpen(ip, 5555, 300)) {
-                        success = sendAdbKey(ip, 5555, 0); // wake ADB session
-                        // Send intent via HTTP/DIAL fallback
+                    // 1. Primary: Google TV Remote v2 AppLink via TLS port 6466
+                    if (appLink != null) {
+                        success = sendGoogleTvAppLink(ip, appLink);
+                        if (success) {
+                            protocolInfo = "Google TV Remote v2 AppLink (" + appSlug + ")";
+                        }
                     }
 
-                    // Standard DIAL launch on port 8008
-                    String dialApp = "YouTube";
-                    if ("netflix".equalsIgnoreCase(appSlug)) dialApp = "Netflix";
-                    else if ("prime".equalsIgnoreCase(appSlug)) dialApp = "AmazonInstantVideo";
-                    else if ("spotify".equalsIgnoreCase(appSlug)) dialApp = "Spotify";
+                    // 2. Secondary: ADB Wi-Fi if port 5555 is enabled
+                    if (!success && isPortOpen(ip, 5555, 300)) {
+                        String pkg = getAndroidTvPackageName(appSlug);
+                        success = sendAdbLaunchApp(ip, 5555, pkg, appLink);
+                        if (success) {
+                            protocolInfo = "Android TV ADB Intent (" + pkg + ")";
+                        }
+                    }
 
-                    success = httpPost("http://" + ip + ":8008/apps/" + dialApp, null, 2500);
+                    // 3. Tertiary: Sony Bravia IRCC & REST API
+                    if (!success && (isPortOpen(ip, 80, 200) || isPortOpen(ip, 20060, 200))) {
+                        success = sendSonyBraviaLaunch(ip, appSlug);
+                        if (success) {
+                            protocolInfo = "Sony BRAVIA Launch (" + appSlug + ")";
+                        }
+                    }
+
+                    // 4. Quaternary: Standard DIAL launch on port 8008
+                    if (!success && isPortOpen(ip, 8008, 300)) {
+                        String dialApp = getDialAppName(appSlug);
+                        if (dialApp != null) {
+                            success = httpPost("http://" + ip + ":8008/apps/" + dialApp, null, 2500);
+                            if (success) {
+                                protocolInfo = "DIAL Launch (" + dialApp + ")";
+                            }
+                        }
+                    }
+
+                    // 5. If TV is unreachable, try waking via WoL and retry AppLink
+                    if (!success && appLink != null) {
+                        sendWakeOnLan(ip);
+                        try { Thread.sleep(150); } catch (Exception ignored) {}
+                        success = sendGoogleTvAppLink(ip, appLink);
+                        if (success) {
+                            protocolInfo = "Google TV Wake+AppLink (" + appSlug + ")";
+                        }
+                    }
                 } else if ("samsung".equalsIgnoreCase(brand)) {
-                    String appId = "111299001912"; // YouTube
-                    if ("netflix".equalsIgnoreCase(appSlug)) appId = "11101200001";
-                    else if ("prime".equalsIgnoreCase(appSlug)) appId = "3201512006785";
-                    else if ("disney".equalsIgnoreCase(appSlug)) appId = "3201907018807";
-                    else if ("spotify".equalsIgnoreCase(appSlug)) appId = "3201606009684";
-                    else if ("apple".equalsIgnoreCase(appSlug)) appId = "3201807016597";
+                    String appId = getSamsungAppId(appSlug);
                     success = httpPost("http://" + ip + ":8001/api/v2/applications/" + appId, null, 2500);
+                    if (!success) {
+                        success = sendSamsungWebSocketKey(ip, port > 0 ? port : 8002, "KEY_HOME");
+                    }
+                    protocolInfo = "Samsung Tizen Launch (" + appId + ")";
+                } else if ("lg_webos".equalsIgnoreCase(brand)) {
+                    String lgAppId = getLgAppId(appSlug);
+                    success = sendLgWebSocketLaunch(ip, port > 0 ? port : 3001, lgAppId);
+                    protocolInfo = "LG webOS Launch (" + lgAppId + ")";
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Launch app failed", e);
+                protocolInfo = "Error: " + e.getMessage();
             }
 
             try {
                 JSONObject res = new JSONObject();
                 res.put("appSlug", appSlug);
                 res.put("success", success);
+                res.put("protocol", protocolInfo);
                 dispatchJSEvent("tv-launch-result", res);
             } catch (Exception e) {
                 // ignore
             }
         });
+    }
+
+    private String getGoogleTvAppLink(String appSlug) {
+        if ("youtube".equalsIgnoreCase(appSlug)) return "https://www.youtube.com";
+        if ("netflix".equalsIgnoreCase(appSlug)) return "https://www.netflix.com";
+        if ("disney".equalsIgnoreCase(appSlug) || "hotstar".equalsIgnoreCase(appSlug)) return "https://www.hotstar.com";
+        if ("prime".equalsIgnoreCase(appSlug)) return "https://app.primevideo.com";
+        if ("jiocinema".equalsIgnoreCase(appSlug)) return "https://www.jiocinema.com";
+        if ("sonyliv".equalsIgnoreCase(appSlug)) return "https://www.sonyliv.com";
+        if ("spotify".equalsIgnoreCase(appSlug)) return "spotify://";
+        if ("apple".equalsIgnoreCase(appSlug)) return "https://tv.apple.com";
+        return "https://www." + appSlug + ".com";
+    }
+
+    private String getAndroidTvPackageName(String appSlug) {
+        if ("youtube".equalsIgnoreCase(appSlug)) return "com.google.android.youtube.tv";
+        if ("netflix".equalsIgnoreCase(appSlug)) return "com.netflix.ninja";
+        if ("prime".equalsIgnoreCase(appSlug)) return "com.amazon.amazonvideo.livingroom";
+        if ("disney".equalsIgnoreCase(appSlug) || "hotstar".equalsIgnoreCase(appSlug)) return "in.startv.hotstar";
+        if ("spotify".equalsIgnoreCase(appSlug)) return "com.spotify.tv.android";
+        if ("apple".equalsIgnoreCase(appSlug)) return "com.apple.atve.androidtv.appletv";
+        if ("jiocinema".equalsIgnoreCase(appSlug)) return "com.jio.media.ondemand";
+        if ("sonyliv".equalsIgnoreCase(appSlug)) return "com.sonyliv";
+        if ("twitch".equalsIgnoreCase(appSlug)) return "tv.twitch.android.app";
+        if ("crunchyroll".equalsIgnoreCase(appSlug)) return "com.crunchyroll.crunchyroid";
+        return "com." + appSlug;
+    }
+
+    private boolean sendAdbLaunchApp(String ip, int port, String pkg, String uri) {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(ip, port), 800);
+            OutputStream os = socket.getOutputStream();
+            String cmd;
+            if (uri != null && !uri.isEmpty()) {
+                cmd = "shell:am start -a android.intent.action.VIEW -d \"" + uri + "\"\n";
+            } else {
+                cmd = "shell:monkey -p " + pkg + " -c android.intent.category.LAUNCHER 1\n";
+            }
+            os.write(cmd.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean sendSonyBraviaLaunch(String ip, String appSlug) {
+        try {
+            String ircc = null;
+            if ("youtube".equalsIgnoreCase(appSlug)) ircc = "AAAAAgAAAMQAAABHAw==";
+            else if ("netflix".equalsIgnoreCase(appSlug)) ircc = "AAAAAgAAABoAAAB8Aw==";
+            else if ("prime".equalsIgnoreCase(appSlug)) ircc = "AAAAAgAAABoAAAB9Aw==";
+            if (ircc != null) {
+                return sendSonyIrcc(ip, ircc);
+            }
+            String pkg = getAndroidTvPackageName(appSlug);
+            String body = "{\"method\":\"setActiveApp\",\"params\":[{\"uri\":\"com.sony.dtv." + pkg + "\"}],\"id\":1,\"version\":\"1.0\"}";
+            return httpPost("http://" + ip + "/sony/appControl", body, 2000);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String getDialAppName(String appSlug) {
+        if ("youtube".equalsIgnoreCase(appSlug)) return "YouTube";
+        if ("netflix".equalsIgnoreCase(appSlug)) return "Netflix";
+        if ("prime".equalsIgnoreCase(appSlug)) return "AmazonInstantVideo";
+        if ("spotify".equalsIgnoreCase(appSlug)) return "Spotify";
+        return null;
+    }
+
+    private String getLgAppId(String appSlug) {
+        if ("youtube".equalsIgnoreCase(appSlug)) return "youtube.leanback.v4";
+        if ("netflix".equalsIgnoreCase(appSlug)) return "netflix";
+        if ("disney".equalsIgnoreCase(appSlug) || "hotstar".equalsIgnoreCase(appSlug)) return "hotstar";
+        if ("prime".equalsIgnoreCase(appSlug)) return "amazon";
+        if ("jiocinema".equalsIgnoreCase(appSlug)) return "com.jio.media.ondemand";
+        if ("sonyliv".equalsIgnoreCase(appSlug)) return "com.sonyliv";
+        if ("spotify".equalsIgnoreCase(appSlug)) return "spotify-beehive";
+        if ("apple".equalsIgnoreCase(appSlug)) return "com.apple.appletv";
+        return appSlug;
+    }
+
+    private boolean sendLgWebSocketLaunch(String ip, int port, String lgAppId) {
+        Socket socket = null;
+        try {
+            socket = new Socket();
+            socket.setSoTimeout(1500);
+            socket.connect(new InetSocketAddress(ip, port), 1200);
+
+            OutputStream os = socket.getOutputStream();
+            InputStream is = socket.getInputStream();
+
+            String wsHandshake = "GET / HTTP/1.1\r\n" +
+                    "Host: " + ip + ":" + port + "\r\n" +
+                    "Upgrade: websocket\r\n" +
+                    "Connection: Upgrade\r\n" +
+                    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+                    "Sec-WebSocket-Version: 13\r\n\r\n";
+
+            os.write(wsHandshake.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+
+            byte[] buf = new byte[1024];
+            int read = is.read(buf);
+            String resp = new String(buf, 0, Math.max(0, read), StandardCharsets.UTF_8);
+            if (resp.contains("101")) {
+                String payload = "{\"type\":\"request\",\"id\":\"launch_1\",\"uri\":\"ssap://system.launcher/launch\",\"payload\":{\"id\":\"" + lgAppId + "\"}}";
+                byte[] payloadBytes = payload.getBytes(StandardCharsets.UTF_8);
+
+                ByteArrayOutputStream frame = new ByteArrayOutputStream();
+                frame.write(0x81);
+                byte[] mask = new byte[]{0x22, 0x44, 0x66, (byte) 0x88};
+                frame.write(0x80 | payloadBytes.length);
+                frame.write(mask);
+                for (int i = 0; i < payloadBytes.length; i++) {
+                    frame.write(payloadBytes[i] ^ mask[i % 4]);
+                }
+
+                os.write(frame.toByteArray());
+                os.flush();
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (socket != null) {
+                try { socket.close(); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private String getSamsungAppId(String appSlug) {
+        if ("youtube".equalsIgnoreCase(appSlug)) return "111299001912";
+        if ("netflix".equalsIgnoreCase(appSlug)) return "11101200001";
+        if ("prime".equalsIgnoreCase(appSlug)) return "3201512006785";
+        if ("disney".equalsIgnoreCase(appSlug)) return "3201907018807";
+        if ("hotstar".equalsIgnoreCase(appSlug)) return "3201806016432";
+        if ("jiocinema".equalsIgnoreCase(appSlug)) return "3201907018808";
+        if ("sonyliv".equalsIgnoreCase(appSlug)) return "3201807016598";
+        if ("spotify".equalsIgnoreCase(appSlug)) return "3201606009684";
+        if ("apple".equalsIgnoreCase(appSlug)) return "3201807016597";
+        return "111299001912";
     }
 
     @JavascriptInterface

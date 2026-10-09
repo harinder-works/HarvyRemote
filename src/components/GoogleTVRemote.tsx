@@ -137,6 +137,23 @@ export function GoogleTVRemote({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Listen for TV app launch results
+  useEffect(() => {
+    const handleLaunchResult = (e: any) => {
+      const detail = e.detail;
+      if (detail?.appSlug) {
+        const appName = detail.appSlug.toUpperCase();
+        if (detail.success) {
+          showStatus(`Launched ${appName} on TV ✓`);
+        } else {
+          showStatus(`Sent launch ${appName} to TV`);
+        }
+      }
+    };
+    window.addEventListener('tv-launch-result', handleLaunchResult);
+    return () => window.removeEventListener('tv-launch-result', handleLaunchResult);
+  }, []);
+
   // Long-press timer on empty area to initiate dragging
   const longPressTimerRef = useRef<number | null>(null);
   const pendingTouchRef = useRef<{ clientX: number; clientY: number } | null>(null);
