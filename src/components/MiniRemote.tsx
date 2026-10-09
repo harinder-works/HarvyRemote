@@ -6,34 +6,23 @@ import {
   Play,
   Pause,
   X,
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  Undo2,
-  Tv,
-  Usb,
 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { RemoteTheme } from '../types/remote';
-import { SmartTVDevice, universalTV } from '../utils/universalTVProtocol';
+import { SmartTVDevice } from '../utils/universalTVProtocol';
 
 interface MiniRemoteProps {
   isOpen: boolean;
   theme: RemoteTheme;
   isPip?: boolean;
   onExpand: () => void;
-  onDpadPress: (direction: 'up' | 'down' | 'left' | 'right') => void;
+  onDpadPress?: (direction: 'up' | 'down' | 'left' | 'right') => void;
   onSelectPress: () => void;
-  onBackPress: () => void;
-  onHomePress: () => void;
+  onBackPress?: () => void;
+  onHomePress?: () => void;
   onVoicePress?: () => void;
   onMutePress: () => void;
   onPowerPress: () => void;
-  onInputPress?: () => void;
-  onUsbPress?: () => void;
-  onLaunchApp?: (appId: string) => void;
   onVolumeChange: (delta: number) => void;
   onCloseApp?: () => void;
   isListening?: boolean;
@@ -44,56 +33,56 @@ interface MiniRemoteProps {
 export function MiniRemote({
   isOpen,
   onExpand,
-  onDpadPress,
   onSelectPress,
-  onBackPress,
-  onHomePress,
   onMutePress,
   onPowerPress,
-  onInputPress,
-  onUsbPress,
-  onLaunchApp,
   onVolumeChange,
   onCloseApp,
   connectedDevice,
 }: MiniRemoteProps) {
   if (!isOpen) return null;
 
-  const [windowDimensions, setWindowDimensions] = useState<{ width: number; height: number }>(() => ({
-    width: typeof window !== 'undefined' ? window.innerWidth : 360,
-    height: typeof window !== 'undefined' ? window.innerHeight : 600,
-  }));
+  // Safe screen boundary helpers (Pebble width is 154px, height is ~140px)
+  const PEBBLE_WIDTH = 154;
+  const PEBBLE_HEIGHT = 145;
+  const MARGIN_X = 12;
+  const MARGIN_Y = 16;
 
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  const clampX = useCallback((x: number) => {
+    const width = typeof window !== 'undefined' ? window.innerWidth : 360;
+    const maxX = Math.max(MARGIN_X, width - PEBBLE_WIDTH - MARGIN_X);
+    return Math.min(Math.max(MARGIN_X, x), maxX);
   }, []);
 
-  // Floating drag position for desktop / browser testing
+  const clampY = useCallback((y: number) => {
+    const height = typeof window !== 'undefined' ? window.innerHeight : 640;
+    const maxY = Math.max(MARGIN_Y, height - PEBBLE_HEIGHT - MARGIN_Y);
+    return Math.min(Math.max(MARGIN_Y, y), maxY);
+  }, []);
+
+  // Floating drag position: safely clamped inside phone viewport at all times
   const [position, setPosition] = useState<{ x: number; y: number }>(() => {
-    if (typeof window === 'undefined') return { x: 20, y: 100 };
-    const saved = localStorage.getItem('gtv_mini_remote_pos');
-    if (saved) {
+    const width = typeof window !== 'undefined' ? window.innerWidth : 360;
+    const height = typeof window !== 'undefined' ? window.innerHeight : 640;
+    const defaultX = Math.max(MARGIN_X, width - PEBBLE_WIDTH - 16);
+    const defaultY = Math.max(MARGIN_Y, height - PEBBLE_HEIGHT - 90);
+
+    if (typeof window !== 'undefined') {
       try {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          const maxX = Math.max(10, window.innerWidth - 220);
-          const maxY = Math.max(10, window.innerHeight - 440);
-          return {
-            x: Math.min(Math.max(8, parsed.x), maxX),
-            y: Math.min(Math.max(8, parsed.y), maxY),
-          };
+        const saved = localStorage.getItem('gtv_mini_remote_pos');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+            const maxX = Math.max(MARGIN_X, width - PEBBLE_WIDTH - MARGIN_X);
+            const maxY = Math.max(MARGIN_Y, height - PEBBLE_HEIGHT - MARGIN_Y);
+            return {
+              x: Math.min(Math.max(MARGIN_X, parsed.x), maxX),
+              y: Math.min(Math.max(MARGIN_Y, parsed.y), maxY),
+            };
+          }
         }
       } catch {}
     }
-    const defaultX = Math.max(12, (window.innerWidth || 360) - 232);
-    const defaultY = Math.max(40, (window.innerHeight || 640) - 460);
     return { x: defaultX, y: defaultY };
   });
 
@@ -122,17 +111,10 @@ export function MiniRemote({
     if (!dragRef.current) return;
     const deltaX = clientX - dragRef.current.startX;
     const deltaY = clientY - dragRef.current.startY;
-
-    const minX = 0;
-    const maxX = Math.max(20, (window.innerWidth || 360) - 220);
-    const minY = 0;
-    const maxY = Math.max(20, (window.innerHeight || 640) - 440);
-
-    const nextX = Math.min(Math.max(minX, dragRef.current.initialX + deltaX), maxX);
-    const nextY = Math.min(Math.max(minY, dragRef.current.initialY + deltaY), maxY);
-
+    const nextX = clampX(dragRef.current.initialX + deltaX);
+    const nextY = clampY(dragRef.current.initialY + deltaY);
     setPosition({ x: nextX, y: nextY });
-  }, []);
+  }, [clampX, clampY]);
 
   const endDrag = useCallback(() => {
     if (!dragRef.current) return;
@@ -167,16 +149,19 @@ export function MiniRemote({
     };
   }, [isDragging, moveDrag, endDrag]);
 
-  // Keep inside screen bounds on resize
+  // Keep strictly inside screen bounds on resize/orientation change
   useEffect(() => {
-    const maxX = Math.max(20, windowDimensions.width - 220);
-    const maxY = Math.max(20, windowDimensions.height - 440);
-    setPosition((prev) => ({
-      x: Math.min(Math.max(8, prev.x), maxX),
-      y: Math.min(Math.max(8, prev.y), maxY),
-    }));
-  }, [windowDimensions]);
+    const handleResize = () => {
+      setPosition((prev) => ({
+        x: clampX(prev.x),
+        y: clampY(prev.y),
+      }));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [clampX, clampY]);
 
+  // Touch drag handlers
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('input')) {
@@ -205,32 +190,56 @@ export function MiniRemote({
     }
   };
 
-  const launchShortcut = (appId: string) => {
-    sound.playClick('action');
-    if (onLaunchApp) {
-      onLaunchApp(appId);
-    } else {
-      universalTV.launchApp(appId);
-    }
+  // Double-click/tap on blank area to center remote on screen
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    const width = typeof window !== 'undefined' ? window.innerWidth : 360;
+    const height = typeof window !== 'undefined' ? window.innerHeight : 640;
+    const centerX = clampX(Math.round((width - PEBBLE_WIDTH) / 2));
+    const centerY = clampY(Math.round((height - PEBBLE_HEIGHT) / 2));
+    sound.playClick('soft');
+    setPosition({ x: centerX, y: centerY });
+    try {
+      localStorage.setItem('gtv_mini_remote_pos', JSON.stringify({ x: centerX, y: centerY }));
+    } catch {}
   };
 
-  // Complete, fully-functional mini remote pebble
+  // Sleek Minimal Remote Pebble (Exact original size: 154px, 3 rows only)
   const pebbleContent = (
     <div
-      className={`w-[216px] max-w-[94vw] flex flex-col justify-between rounded-[32px] border-2 bg-[#EAEDF1] border-[#D3D8DF] text-slate-800 p-2.5 shadow-2xl select-none transition-all ${
-        isDragging ? 'ring-2 ring-sky-400 shadow-2xl scale-[1.02]' : ''
+      onDoubleClick={handleDoubleClick}
+      title="Drag anywhere on blank area to move. Double-tap to center."
+      className={`w-[154px] max-w-[92vw] rounded-[26px] border-2 bg-[#EDEDF0] text-slate-800 p-2.5 pt-2 select-none remote-shadow flex flex-col items-center shrink-0 my-auto transition-all ${
+        isDragging ? 'ring-2 ring-sky-400/70 shadow-2xl border-sky-300 scale-[1.02]' : 'border-[#D9DDE2]'
       }`}
     >
-      {/* 1. Header Row (TV status, Expand, Close) */}
-      <div className="w-full flex items-center justify-between pb-1.5 mb-1.5 border-b border-black/10 select-none">
-        <div className="flex items-center gap-1.5 min-w-0 max-w-[90px] pointer-events-none">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${connectedDevice?.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-          <span className="text-[10px] font-bold text-slate-700 truncate leading-tight">
-            {connectedDevice ? connectedDevice.name : 'TV Remote'}
+      {/* 1. Top Controls (TV status, Power, Expand to full, Close) */}
+      <div className="w-full flex items-center justify-between pb-1.5 mb-2 border-b border-black/10 select-none">
+        <div className="flex items-center gap-1.5 pl-0.5 py-0.5 min-w-0 max-w-[70px] pointer-events-none">
+          {connectedDevice?.isConnected && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          )}
+          <span className="text-[10px] font-semibold text-slate-700 truncate">
+            {connectedDevice ? connectedDevice.name : 'TV'}
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {/* Power Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              sound.playClick('action');
+              onPowerPress();
+            }}
+            title="TV Power"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-emerald-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+          >
+            <Power className="w-3.5 h-3.5 stroke-[2]" />
+          </button>
+
           {/* Expand to Full Remote Button */}
           <button
             type="button"
@@ -240,10 +249,9 @@ export function MiniRemote({
               onExpand();
             }}
             title="Expand to Full Remote"
-            className="px-2 py-1 rounded-lg bg-[#DEE2E8] hover:bg-[#D5DAE1] border border-[#CBD1DA] flex items-center gap-1 text-[9.5px] font-bold text-slate-700 hover:text-slate-900 active:scale-95 cursor-pointer shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
           >
-            <Maximize2 className="w-3 h-3 stroke-[2.2]" />
-            <span>Full</span>
+            <Maximize2 className="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           {/* Close Remote Button */}
@@ -255,179 +263,32 @@ export function MiniRemote({
               onCloseApp?.();
             }}
             title="Close Remote & Exit"
-            className="w-7 h-7 rounded-lg bg-[#DEE2E8] hover:bg-rose-100 hover:text-rose-600 border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-rose-100 border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
           >
-            <X className="w-3.5 h-3.5 stroke-[2.2]" />
+            <X className="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
 
-      {/* 2. Top Hardware Row: Power, Input, USB, Mute */}
-      <div className="grid grid-cols-4 gap-1 w-full mb-1.5">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('action');
-            onPowerPress();
-          }}
-          title="TV Power"
-          className="h-8 rounded-xl bg-[#DEE2E8] hover:bg-emerald-50 hover:text-emerald-600 border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <Power className="w-3.5 h-3.5 stroke-[2.2]" />
-        </button>
+      {/* 2. Main Play / Pause (OK Button) */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          sound.playClick('action');
+          onSelectPress();
+        }}
+        title="Play / Pause (OK / Select)"
+        className="w-full h-11 mb-2 rounded-2xl bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-slate-200 active:to-slate-300 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center gap-1.5 cursor-pointer text-slate-700 font-semibold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
+      >
+        <Play className="w-3 h-3 fill-slate-700 text-slate-700 ml-0.5" />
+        <span>OK</span>
+        <Pause className="w-3 h-3 fill-slate-700 text-slate-700" />
+      </button>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('action');
-            if (onInputPress) onInputPress();
-            else universalTV.sendAction('TV_INPUT');
-          }}
-          title="TV Input / Source"
-          className="h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <Tv className="w-3.5 h-3.5 stroke-[2.2]" />
-        </button>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('action');
-            if (onUsbPress) onUsbPress();
-            else universalTV.sendAction('USB_MEDIA');
-          }}
-          title="USB Media"
-          className="h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <Usb className="w-3.5 h-3.5 stroke-[2.2]" />
-        </button>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('button');
-            onMutePress();
-          }}
-          title="Mute Audio"
-          className="h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <VolumeX className="w-3.5 h-3.5 stroke-[2.2]" />
-        </button>
-      </div>
-
-      {/* 3. Directional Controls & OK (Separated Buttons) */}
-      <div className="flex flex-col items-center gap-1 my-1">
-        {/* UP */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('dpad');
-            onDpadPress('up');
-          }}
-          title="Up"
-          className="w-16 h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <ChevronUp className="w-4 h-4 stroke-[2.5]" />
-        </button>
-
-        {/* MIDDLE: LEFT, OK, RIGHT */}
-        <div className="flex items-center gap-1 w-full justify-center">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sound.playClick('dpad');
-              onDpadPress('left');
-            }}
-            title="Left"
-            className="w-12 h-9 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-          >
-            <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
-          </button>
-
-          {/* CENTER OK / SELECT */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sound.playClick('action');
-              onSelectPress();
-            }}
-            title="OK / Select"
-            className="flex-1 h-9 max-w-[74px] rounded-xl bg-gradient-to-b from-[#FFFFFF] to-[#E3E7ED] hover:from-[#F5F7FA] hover:to-[#D9DFE6] active:from-[#DDE2E9] active:to-[#CDD3DC] border border-[#C6CCD6] shadow-sm flex items-center justify-center gap-1 text-slate-800 font-bold text-xs active:scale-95 cursor-pointer"
-          >
-            <Play className="w-2.5 h-2.5 fill-slate-800" />
-            <span>OK</span>
-            <Pause className="w-2.5 h-2.5 fill-slate-800" />
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sound.playClick('dpad');
-              onDpadPress('right');
-            }}
-            title="Right"
-            className="w-12 h-9 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-          >
-            <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-          </button>
-        </div>
-
-        {/* DOWN */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('dpad');
-            onDpadPress('down');
-          }}
-          title="Down"
-          className="w-16 h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <ChevronDown className="w-4 h-4 stroke-[2.5]" />
-        </button>
-      </div>
-
-      {/* 4. Navigation Row: Back & Home */}
-      <div className="grid grid-cols-2 gap-1 w-full my-1">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('button');
-            onBackPress();
-          }}
-          title="Back"
-          className="h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center gap-1 text-[11px] font-bold text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <Undo2 className="w-3.5 h-3.5 stroke-[2.2]" />
-          <span>Back</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            sound.playClick('button');
-            onHomePress();
-          }}
-          title="Home"
-          className="h-8 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center gap-1 text-[11px] font-bold text-slate-700 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <Home className="w-3.5 h-3.5 stroke-[2.2]" />
-          <span>Home</span>
-        </button>
-      </div>
-
-      {/* 5. Volume Row: Vol − & Vol + */}
-      <div className="grid grid-cols-2 gap-1 w-full my-1">
+      {/* 3. Volume Controls & Mute Row */}
+      <div className="grid grid-cols-3 gap-1.5 w-full">
+        {/* Volume Down */}
         <button
           type="button"
           onClick={(e) => {
@@ -436,11 +297,26 @@ export function MiniRemote({
             onVolumeChange(-5);
           }}
           title="Volume Down (−)"
-          className="h-8.5 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center text-xs font-bold text-slate-700 active:scale-95 cursor-pointer shadow-sm"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none"
         >
-          −  VOL
+          −
         </button>
 
+        {/* Mute */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            sound.playClick('button');
+            onMutePress();
+          }}
+          title="Mute Audio"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none"
+        >
+          <VolumeX className="w-4 h-4 stroke-[2]" />
+        </button>
+
+        {/* Volume Up */}
         <button
           type="button"
           onClick={(e) => {
@@ -449,48 +325,9 @@ export function MiniRemote({
             onVolumeChange(5);
           }}
           title="Volume Up (+)"
-          className="h-8.5 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] active:bg-[#CBD1DA] border border-[#CBD1DA] flex items-center justify-center text-xs font-bold text-slate-700 active:scale-95 cursor-pointer shadow-sm"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none"
         >
-          VOL  +
-        </button>
-      </div>
-
-      {/* 6. Streaming Apps Grid: YouTube, Netflix, Hotstar, Prime */}
-      <div className="grid grid-cols-2 gap-1 w-full pt-1 border-t border-black/10">
-        <button
-          type="button"
-          onClick={() => launchShortcut('youtube')}
-          className="h-7.5 rounded-xl bg-[#DC2626]/10 hover:bg-[#DC2626]/20 border border-[#DC2626]/30 text-[#DC2626] font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626]" />
-          <span>YouTube</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => launchShortcut('netflix')}
-          className="h-7.5 rounded-xl bg-[#E50914]/10 hover:bg-[#E50914]/20 border border-[#E50914]/30 text-[#E50914] font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#E50914]" />
-          <span>Netflix</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => launchShortcut('hotstar')}
-          className="h-7.5 rounded-xl bg-[#1D4ED8]/10 hover:bg-[#1D4ED8]/20 border border-[#1D4ED8]/30 text-[#1D4ED8] font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#1D4ED8]" />
-          <span>Hotstar</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => launchShortcut('prime')}
-          className="h-7.5 rounded-xl bg-[#0284C7]/10 hover:bg-[#0284C7]/20 border border-[#0284C7]/30 text-[#0284C7] font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-sm"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7]" />
-          <span>Prime</span>
+          +
         </button>
       </div>
     </div>
@@ -507,8 +344,8 @@ export function MiniRemote({
           willChange: 'transform',
         }}
         className={`pointer-events-auto touch-none cursor-grab ${
-          isDragging ? 'cursor-grabbing' : ''
-        } inline-block remote-draggable-container`}
+          isDragging ? 'cursor-grabbing shadow-2xl scale-[1.02]' : ''
+        } transition-shadow duration-150 inline-block remote-draggable-container`}
       >
         {pebbleContent}
       </div>

@@ -313,14 +313,8 @@ export default function App() {
           isOpen={true}
           theme={theme}
           onExpand={handleExitMini}
-          onDpadPress={handleDpadPress}
           onSelectPress={handleSelectPress}
-          onBackPress={handleBackPress}
-          onHomePress={handleHomePress}
           onPowerPress={handlePowerPress}
-          onInputPress={handleInputPress}
-          onUsbPress={handleUsbPress}
-          onLaunchApp={(appId) => universalTV.launchApp(appId)}
           onMutePress={handleMutePress}
           onVolumeChange={handleVolumeChange}
           onCloseApp={handleCloseApp}

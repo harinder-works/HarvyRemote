@@ -228,7 +228,7 @@ public class FloatingRemoteManager {
     private View createFloatingView() {
         Context ctx = activity.getApplicationContext();
 
-        int cardWidthDp = isFullMode ? 244 : 208;
+        int cardWidthDp = isFullMode ? 244 : 156;
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
         int pad = dpToPx(8);
@@ -488,122 +488,48 @@ public class FloatingRemoteManager {
             card.addView(appRow3);
 
         } else {
-            // MINI REMOTE MODE (Compact, balanced & complete)
-            // 1. Hardware Row: Power, Input, Mute
-            LinearLayout hwRow = new LinearLayout(ctx);
-            hwRow.setOrientation(LinearLayout.HORIZONTAL);
-            hwRow.setWeightSum(3.0f);
-            hwRow.setPadding(0, 0, 0, dpToPx(3));
-
-            Button btnPower = createActionButton(ctx, "⏻", 13, Color.parseColor("#0F172A"));
+            // MINI REMOTE MODE (Minimal: Power, Play/Pause OK, Volume Row)
+            Button btnPower = createActionButton(ctx, "⏻ Power", 11, Color.parseColor("#0F172A"));
+            LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(34));
+            pLp.setMargins(0, 0, 0, dpToPx(4));
+            btnPower.setLayoutParams(pLp);
             btnPower.setOnClickListener(v -> {
                 vibrateTap(ctx);
                 sendAction("POWER");
             });
-            hwRow.addView(btnPower);
-
-            Button btnInput = createActionButton(ctx, "📥 Input", 10.5f, Color.parseColor("#0F172A"));
-            btnInput.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("TV_INPUT");
-            });
-            hwRow.addView(btnInput);
-
-            Button btnMute = createActionButton(ctx, "🔇", 13, Color.parseColor("#0F172A"));
-            btnMute.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("MUTE");
-            });
-            hwRow.addView(btnMute);
-
-            card.addView(hwRow);
-
-            // 2. Separated D-Pad (Up, Left, Center OK, Right, Down)
-            LinearLayout dpadContainer = new LinearLayout(ctx);
-            dpadContainer.setOrientation(LinearLayout.VERTICAL);
-            dpadContainer.setGravity(Gravity.CENTER_HORIZONTAL);
-            dpadContainer.setPadding(0, dpToPx(2), 0, dpToPx(2));
-
-            Button btnUp = createDirectionalButton(ctx, "▲");
-            btnUp.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_UP");
-            });
-            dpadContainer.addView(btnUp);
-
-            LinearLayout midRow = new LinearLayout(ctx);
-            midRow.setOrientation(LinearLayout.HORIZONTAL);
-            midRow.setGravity(Gravity.CENTER_VERTICAL);
-            midRow.setPadding(0, dpToPx(2), 0, dpToPx(2));
-
-            Button btnLeft = createDirectionalButton(ctx, "◀");
-            btnLeft.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_LEFT");
-            });
-            midRow.addView(btnLeft);
+            card.addView(btnPower);
 
             Button btnOk = createOkButton(ctx);
+            LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(42));
+            okLp.setMargins(0, 0, 0, dpToPx(4));
+            btnOk.setLayoutParams(okLp);
+            btnOk.setText("▶  OK  ❚❚");
             btnOk.setOnClickListener(v -> {
                 vibrateTap(ctx);
                 sendAction("SELECT");
             });
-            midRow.addView(btnOk);
+            card.addView(btnOk);
 
-            Button btnRight = createDirectionalButton(ctx, "▶");
-            btnRight.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_RIGHT");
-            });
-            midRow.addView(btnRight);
-
-            dpadContainer.addView(midRow);
-
-            Button btnDown = createDirectionalButton(ctx, "▼");
-            btnDown.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_DOWN");
-            });
-            dpadContainer.addView(btnDown);
-
-            card.addView(dpadContainer);
-
-            // 3. Navigation Row: Back & Home
-            LinearLayout navRow = new LinearLayout(ctx);
-            navRow.setOrientation(LinearLayout.HORIZONTAL);
-            navRow.setWeightSum(2.0f);
-            navRow.setPadding(0, 0, 0, dpToPx(3));
-
-            Button btnBack = createActionButton(ctx, "⮌ Back", 10.5f, Color.parseColor("#1E293B"));
-            btnBack.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("BACK");
-            });
-            navRow.addView(btnBack);
-
-            Button btnHome = createActionButton(ctx, "⌂ Home", 10.5f, Color.parseColor("#1E293B"));
-            btnHome.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("HOME");
-            });
-            navRow.addView(btnHome);
-
-            card.addView(navRow);
-
-            // 4. Volume Row: Vol − & Vol +
             LinearLayout volRow = new LinearLayout(ctx);
             volRow.setOrientation(LinearLayout.HORIZONTAL);
-            volRow.setWeightSum(2.0f);
-            volRow.setPadding(0, 0, 0, dpToPx(3));
+            volRow.setWeightSum(3.0f);
+            volRow.setPadding(0, 0, 0, dpToPx(2));
 
-            Button btnVolDown = createActionButton(ctx, "−  VOL", 10.5f, Color.parseColor("#1E293B"));
+            Button btnVolDown = createActionButton(ctx, "−", 14, Color.parseColor("#1E293B"));
             btnVolDown.setOnClickListener(v -> {
                 vibrateTap(ctx);
                 sendAction("VOLUME_DOWN");
             });
             volRow.addView(btnVolDown);
 
-            Button btnVolUp = createActionButton(ctx, "VOL  +", 10.5f, Color.parseColor("#1E293B"));
+            Button btnMute = createActionButton(ctx, "🔇", 11, Color.parseColor("#1E293B"));
+            btnMute.setOnClickListener(v -> {
+                vibrateTap(ctx);
+                sendAction("MUTE");
+            });
+            volRow.addView(btnMute);
+
+            Button btnVolUp = createActionButton(ctx, "+", 14, Color.parseColor("#1E293B"));
             btnVolUp.setOnClickListener(v -> {
                 vibrateTap(ctx);
                 sendAction("VOLUME_UP");
@@ -611,13 +537,6 @@ public class FloatingRemoteManager {
             volRow.addView(btnVolUp);
 
             card.addView(volRow);
-
-            // 5. Four Streaming App Shortcuts (YouTube, Netflix, Hotstar, Prime)
-            LinearLayout appRow1 = createStreamingAppRow(ctx, "YouTube", Color.parseColor("#DC2626"), "youtube", "Netflix", Color.parseColor("#E50914"), "netflix");
-            card.addView(appRow1);
-
-            LinearLayout appRow2 = createStreamingAppRow(ctx, "Hotstar", Color.parseColor("#1D4ED8"), "hotstar", "Prime Video", Color.parseColor("#0284C7"), "prime");
-            card.addView(appRow2);
         }
 
         return card;
