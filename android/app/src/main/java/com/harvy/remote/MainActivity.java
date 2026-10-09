@@ -73,30 +73,12 @@ public class MainActivity extends BridgeActivity {
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enterPip() {
-                        runOnUiThread(() -> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                try {
-                                    PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                                    Rational aspectRatio = new Rational(2, 3);
-                                    builder.setAspectRatio(aspectRatio);
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        builder.setAutoEnterEnabled(true);
-                                    }
-                                    enterPictureInPictureMode(builder.build());
-                                } catch (Exception ignored) {}
-                            }
-                        });
+                        startFloatingRemote();
                     }
 
                     @JavascriptInterface
                     public void exitPip() {
-                        runOnUiThread(() -> {
-                            try {
-                                Intent intent = new Intent(MainActivity.this, MainActivity.class);
-                                intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                                startActivity(intent);
-                            } catch (Exception ignored) {}
-                        });
+                        hideFloatingRemote();
                     }
 
                     @JavascriptInterface
@@ -258,19 +240,6 @@ public class MainActivity extends BridgeActivity {
                     null
                 );
             }
-        }
-    }
-
-    @Override
-    public void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                Rational aspectRatio = new Rational(2, 3);
-                builder.setAspectRatio(aspectRatio);
-                enterPictureInPictureMode(builder.build());
-            } catch (Exception ignored) {}
         }
     }
 

@@ -21,7 +21,6 @@
             android:launchMode="singleTask"
             android:hardwareAccelerated="true"
             android:resizeableActivity="true"
-            android:supportsPictureInPicture="true"
             android:exported="true">
 
             <intent-filter>

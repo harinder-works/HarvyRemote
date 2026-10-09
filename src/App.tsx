@@ -68,32 +68,30 @@ export default function App() {
     };
   }, []);
 
-  // Enter Picture-in-Picture mode by default
-  const handleEnterPip = () => {
+  // Enter Mini / Floating remote
+  const handleEnterMini = () => {
     sound.playClick('action');
-    setRemoteMode('mini');
-    setIsPip(true);
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.startFloatingRemote) {
       try {
-        (window as any).AndroidNativeBridge.enterPip();
+        (window as any).AndroidNativeBridge.startFloatingRemote();
       } catch (e) {
-        console.error('Android enterPip error:', e);
+        console.error('Android startFloatingRemote error:', e);
       }
     }
+    setRemoteMode('mini');
   };
 
-  // Exit Picture-in-Picture and expand to Full Remote
-  const handleExitPip = () => {
+  // Exit Mini / Floating remote and expand to Full Remote
+  const handleExitMini = () => {
     sound.playClick('action');
-    setRemoteMode('full');
-    setIsPip(false);
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.exitPip) {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hideFloatingRemote) {
       try {
-        (window as any).AndroidNativeBridge.exitPip();
+        (window as any).AndroidNativeBridge.hideFloatingRemote();
       } catch (e) {
-        console.error(e);
+        console.error('Android hideFloatingRemote error:', e);
       }
     }
+    setRemoteMode('full');
   };
 
   // Active connected Smart TV
@@ -302,30 +300,30 @@ export default function App() {
           onInputPress={handleInputPress}
           onUsbPress={handleUsbPress}
           onVolumeChange={handleVolumeChange}
-          onSwitchToMini={handleEnterPip}
+          onSwitchToMini={handleEnterMini}
           onOpenDeviceManager={() => setDeviceModalOpen(true)}
           onCloseApp={handleCloseApp}
           connectedDevice={connectedDevice}
         />
       )}
 
-      {/* MINI REMOTE MODE / PICTURE-IN-PICTURE */}
+      {/* MINI REMOTE MODE */}
       {remoteMode === 'mini' && !isAppClosed && (
         <MiniRemote
           isOpen={true}
           theme={theme}
-          isPip={isPip}
-          onExpand={handleExitPip}
+          onExpand={handleExitMini}
           onDpadPress={handleDpadPress}
           onSelectPress={handleSelectPress}
           onBackPress={handleBackPress}
           onHomePress={handleHomePress}
-          onVoicePress={() => {}}
-          onMutePress={handleMutePress}
           onPowerPress={handlePowerPress}
+          onInputPress={handleInputPress}
+          onUsbPress={handleUsbPress}
+          onLaunchApp={(appId) => universalTV.launchApp(appId)}
+          onMutePress={handleMutePress}
           onVolumeChange={handleVolumeChange}
           onCloseApp={handleCloseApp}
-          isTVOn={true}
           connectedDevice={connectedDevice}
         />
       )}
