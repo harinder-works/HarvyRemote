@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { GoogleTVRemote } from './components/GoogleTVRemote';
 import { MiniRemote } from './components/MiniRemote';
 import { DeviceManagerModal } from './components/DeviceManagerModal';
+import { OverlayPermissionModal } from './components/OverlayPermissionModal';
 import { AppShortcut, RemoteTheme } from './types/remote';
 import { sound } from './utils/audio';
 import {
@@ -28,6 +29,7 @@ export default function App() {
 
   const [isPip, setIsPip] = useState(false);
   const [isAppClosed, setIsAppClosed] = useState(false);
+  const [overlayPermissionModalOpen, setOverlayPermissionModalOpen] = useState(false);
 
   const handleCloseApp = () => {
     sound.playClick('soft');
@@ -68,15 +70,39 @@ export default function App() {
     };
   }, []);
 
-  // Enter Mini / Picture-in-Picture remote
+  // Listen for overlay permission changes
+  useEffect(() => {
+    const handlePermissionStatus = (e: any) => {
+      if (e.detail?.granted) {
+        setOverlayPermissionModalOpen(false);
+        const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
+        if (bridge && typeof bridge.startFloatingRemote === 'function') {
+          try {
+            bridge.startFloatingRemote();
+          } catch {}
+        }
+      }
+    };
+    window.addEventListener('overlay-permission-status', handlePermissionStatus);
+    return () => window.removeEventListener('overlay-permission-status', handlePermissionStatus);
+  }, []);
+
+  // Enter Mini / Floating remote
   const handleEnterMini = () => {
     sound.playClick('action');
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
-      try {
-        (window as any).AndroidNativeBridge.enterPip();
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
+    if (bridge) {
+      if (typeof bridge.hasOverlayPermission === 'function' && bridge.hasOverlayPermission()) {
+        try {
+          bridge.startFloatingRemote();
+          return;
+        } catch (e) {
+          console.error('Android startFloatingRemote error:', e);
+        }
+      } else {
+        // Show permission guidance modal so user can enable it easily
+        setOverlayPermissionModalOpen(true);
         return;
-      } catch (e) {
-        console.error('Android enterPip error:', e);
       }
     }
     setRemoteMode('mini');
@@ -359,6 +385,21 @@ export default function App() {
           />
         </div>
       )}
+
+      {/* OVERLAY PERMISSION GUIDANCE MODAL */}
+      <OverlayPermissionModal
+        isOpen={overlayPermissionModalOpen}
+        onClose={() => setOverlayPermissionModalOpen(false)}
+        onUsePip={() => {
+          setOverlayPermissionModalOpen(false);
+          const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
+          if (bridge && typeof bridge.enterPip === 'function') {
+            try {
+              bridge.enterPip();
+            } catch {}
+          }
+        }}
+      />
     </div>
   );
 }

@@ -36,6 +36,7 @@ public class MainActivity extends BridgeActivity {
 
     private boolean isLaunchedFromExpand = false;
     private NativeTVManager tvManager;
+    private FloatingRemoteManager floatingManager;
     private BroadcastReceiver pipReceiver;
 
     private String currentBrand = "google_tv";
@@ -45,6 +46,9 @@ public class MainActivity extends BridgeActivity {
     private void handleIntent(Intent intent) {
         if (intent != null && "EXPAND".equals(intent.getStringExtra("LAUNCH_MODE"))) {
             isLaunchedFromExpand = true;
+            if (floatingManager != null) {
+                floatingManager.hideFloatingRemote();
+            }
         } else {
             isLaunchedFromExpand = false;
         }
@@ -89,6 +93,9 @@ public class MainActivity extends BridgeActivity {
                 tvManager = new NativeTVManager(MainActivity.this, webView);
                 webView.addJavascriptInterface(tvManager, "NativeTVManager");
 
+                floatingManager = FloatingRemoteManager.getInstance();
+                floatingManager.init(MainActivity.this, tvManager);
+
                 registerPipReceiver();
 
                 webView.addJavascriptInterface(new Object() {
@@ -116,23 +123,47 @@ public class MainActivity extends BridgeActivity {
 
                     @JavascriptInterface
                     public void startFloatingRemote() {
-                        MainActivity.this.enterPip();
+                        runOnUiThread(() -> {
+                            if (floatingManager != null) {
+                                if (floatingManager.canDrawOverlays()) {
+                                    floatingManager.showFloatingRemote();
+                                } else {
+                                    floatingManager.requestOverlayPermission();
+                                }
+                            }
+                        });
                     }
 
                     @JavascriptInterface
                     public void hideFloatingRemote() {
-                        // no-op in native PiP
+                        runOnUiThread(() -> {
+                            if (floatingManager != null) {
+                                floatingManager.hideFloatingRemote();
+                            }
+                        });
                     }
 
                     @JavascriptInterface
                     public boolean hasOverlayPermission() {
-                        return true;
+                        return floatingManager != null && floatingManager.canDrawOverlays();
                     }
 
                     @JavascriptInterface
                     public void requestOverlayPermission() {
-                        // Zero overlay permission required: directly trigger Picture-in-Picture!
-                        MainActivity.this.enterPip();
+                        runOnUiThread(() -> {
+                            if (floatingManager != null) {
+                                floatingManager.requestOverlayPermission();
+                            }
+                        });
+                    }
+
+                    @JavascriptInterface
+                    public void openAppDetailsSettings() {
+                        runOnUiThread(() -> {
+                            if (floatingManager != null) {
+                                floatingManager.openAppDetailsSettings();
+                            }
+                        });
                     }
 
                     @JavascriptInterface
@@ -140,6 +171,9 @@ public class MainActivity extends BridgeActivity {
                         currentBrand = brand;
                         currentIp = ip;
                         currentPort = port;
+                        if (floatingManager != null) {
+                            floatingManager.updateDeviceInfo(brand, ip, port, name);
+                        }
                     }
 
                     @JavascriptInterface
@@ -339,6 +373,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        try {
+            if (isInPictureInPictureMode) {
+                // Set solid matching background so Android doesn't draw a grey letterbox
+                getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#FAFBFD")));
+            } else {
+                // Restore transparent background
+                getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+        } catch (Exception ignored) {}
         WebView webView = getBridge().getWebView();
         if (webView != null) {
             webView.evaluateJavascript(
@@ -351,12 +394,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        WebView webView = getBridge().getWebView();
-        if (webView != null) {
-            webView.evaluateJavascript(
-                "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: true } }));",
-                null
-            );
+        if (floatingManager != null) {
+            boolean hasPermission = floatingManager.canDrawOverlays();
+            WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: " + hasPermission + " } }));",
+                    null
+                );
+            }
         }
     }
 
@@ -384,6 +430,11 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (floatingManager != null) {
+            try {
+                floatingManager.hideFloatingRemote();
+            } catch (Exception ignored) {}
+        }
         if (pipReceiver != null) {
             try {
                 unregisterReceiver(pipReceiver);
