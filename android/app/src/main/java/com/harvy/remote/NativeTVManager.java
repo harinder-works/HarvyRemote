@@ -1466,16 +1466,34 @@ public class NativeTVManager {
                     protocolInfo = "Roku ECP (App ID " + appId + ")";
                 } else if ("google_tv".equalsIgnoreCase(brand) || "android_tv".equalsIgnoreCase(brand) || "fire_tv".equalsIgnoreCase(brand) || brand == null || brand.isEmpty()) {
                     String appLink = getGoogleTvAppLink(appSlug);
+                    String dialApp = getDialAppName(appSlug);
 
-                    // 1. Primary: Google TV Remote v2 AppLink via TLS port 6466
-                    if (appLink != null) {
+                    // 1. Universal DIAL (Discovery & Launch) - standard across YouTube, Netflix, Prime, Spotify
+                    if (dialApp != null) {
+                        success = sendDialLaunch(ip, dialApp);
+                        if (success) {
+                            protocolInfo = "DIAL Launch (" + dialApp + ")";
+                        }
+                    }
+
+                    // 2. Google TV Remote v2 AppLink via TLS port 6466
+                    if (!success && appLink != null) {
                         success = sendGoogleTvAppLink(ip, appLink);
                         if (success) {
                             protocolInfo = "Google TV Remote v2 AppLink (" + appSlug + ")";
                         }
                     }
 
-                    // 2. Secondary: ADB Wi-Fi if port 5555 is enabled
+                    // 3. Alternate URI schemes for Google TV v2 if primary didn't confirm
+                    if (!success && "youtube".equalsIgnoreCase(appSlug)) {
+                        success = sendGoogleTvAppLink(ip, "vnd.youtube://") ||
+                                  sendGoogleTvAppLink(ip, "https://youtube.com/tv");
+                        if (success) {
+                            protocolInfo = "Google TV YouTube AppLink";
+                        }
+                    }
+
+                    // 4. Secondary: ADB Wi-Fi if port 5555 is enabled
                     if (!success && isPortOpen(ip, 5555, 300)) {
                         String pkg = getAndroidTvPackageName(appSlug);
                         success = sendAdbLaunchApp(ip, 5555, pkg, appLink);
@@ -1484,7 +1502,7 @@ public class NativeTVManager {
                         }
                     }
 
-                    // 3. Tertiary: Sony Bravia IRCC & REST API
+                    // 5. Tertiary: Sony Bravia IRCC & REST API
                     if (!success && (isPortOpen(ip, 80, 200) || isPortOpen(ip, 20060, 200))) {
                         success = sendSonyBraviaLaunch(ip, appSlug);
                         if (success) {
@@ -1492,24 +1510,18 @@ public class NativeTVManager {
                         }
                     }
 
-                    // 4. Quaternary: Standard DIAL launch on port 8008
-                    if (!success && isPortOpen(ip, 8008, 300)) {
-                        String dialApp = getDialAppName(appSlug);
-                        if (dialApp != null) {
-                            success = httpPost("http://" + ip + ":8008/apps/" + dialApp, null, 2500);
-                            if (success) {
-                                protocolInfo = "DIAL Launch (" + dialApp + ")";
-                            }
-                        }
-                    }
-
-                    // 5. If TV is unreachable, try waking via WoL and retry AppLink
+                    // 6. Wake on LAN and retry
                     if (!success && appLink != null) {
                         sendWakeOnLan(ip);
                         try { Thread.sleep(150); } catch (Exception ignored) {}
-                        success = sendGoogleTvAppLink(ip, appLink);
+                        if (dialApp != null) {
+                            success = sendDialLaunch(ip, dialApp);
+                        }
+                        if (!success) {
+                            success = sendGoogleTvAppLink(ip, appLink);
+                        }
                         if (success) {
-                            protocolInfo = "Google TV Wake+AppLink (" + appSlug + ")";
+                            protocolInfo = "Wake+Launch (" + appSlug + ")";
                         }
                     }
                 } else if ("samsung".equalsIgnoreCase(brand)) {
@@ -1608,6 +1620,37 @@ public class NativeTVManager {
         if ("prime".equalsIgnoreCase(appSlug)) return "AmazonInstantVideo";
         if ("spotify".equalsIgnoreCase(appSlug)) return "Spotify";
         return null;
+    }
+
+    private boolean sendDialLaunch(String ip, String dialAppName) {
+        if (dialAppName == null || ip == null) return false;
+        try {
+            int[] ports = new int[]{8008, 8009};
+            for (int port : ports) {
+                if (isPortOpen(ip, port, 400)) {
+                    URL url = new URL("http://" + ip + ":" + port + "/apps/" + dialAppName);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(1500);
+                    conn.setReadTimeout(1500);
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("User-Agent", "HarvyRemote/1.0");
+                    conn.setRequestProperty("Content-Length", "0");
+                    conn.setFixedLengthStreamingMode(0);
+                    conn.setDoOutput(true);
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.flush();
+                    }
+                    int code = conn.getResponseCode();
+                    Log.d(TAG, "DIAL POST response for " + dialAppName + " on " + ip + ":" + port + " -> " + code);
+                    if (code >= 200 && code < 400) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "sendDialLaunch exception for " + dialAppName + ": " + e.getMessage());
+        }
+        return false;
     }
 
     private String getLgAppId(String appSlug) {

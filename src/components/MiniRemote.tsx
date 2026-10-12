@@ -336,7 +336,7 @@ export function MiniRemote({
 
   if (isPip) {
     return (
-      <div className="w-full h-full min-h-screen flex items-center justify-center p-1 bg-[#0B0F19] select-none overflow-hidden">
+      <div className="w-full h-full min-h-screen flex items-center justify-center p-1 bg-transparent select-none overflow-hidden">
         {pebbleContent}
       </div>
     );

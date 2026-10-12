@@ -199,6 +199,13 @@ export function DeviceManagerModal({
     setNewDevicePort(String(defaultP));
   }, [newDeviceBrand]);
 
+  // Auto-scan on open if no devices yet
+  useEffect(() => {
+    if (isOpen && deviceList.length === 0) {
+      handleScan();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleScan = () => {

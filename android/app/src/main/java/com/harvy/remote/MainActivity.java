@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Rational;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -61,15 +62,15 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
 
-            // Clean, solid dark background for full remote mode
-            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
-            getWindow().setStatusBarColor(Color.parseColor("#0B0F19"));
-            getWindow().setNavigationBarColor(Color.parseColor("#0B0F19"));
+            // Transparent background so wallpaper & background apps are visible
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setNavigationBarColor(Color.TRANSPARENT);
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
                 webView.setFitsSystemWindows(true);
-                webView.setBackgroundColor(Color.parseColor("#0B0F19"));
+                webView.setBackgroundColor(Color.TRANSPARENT);
 
                 // Hardware compositing layer for 60/120fps UI
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -236,8 +237,8 @@ public class MainActivity extends BridgeActivity {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
                     PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                    // Square aspect ratio for compact mini remote pebble
-                    Rational aspectRatio = new Rational(1, 1);
+                    // Aspect ratio for compact vertical mini remote pebble (3:4)
+                    Rational aspectRatio = new Rational(3, 4);
                     builder.setAspectRatio(aspectRatio);
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         builder.setAutoEnterEnabled(true);
@@ -357,6 +358,16 @@ public class MainActivity extends BridgeActivity {
                 null
             );
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
+            // User touched outside the remote on home screen or another app: enter PiP mode
+            enterPip();
+            return false;
+        }
+        return super.onTouchEvent(event);
     }
 
     @Override

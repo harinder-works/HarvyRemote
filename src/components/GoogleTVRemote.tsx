@@ -367,6 +367,13 @@ export function GoogleTVRemote({
   const handleLaunchAppById = (appId: string) => {
     sound.playClick('action');
     triggerLed(`app-${appId}`);
+
+    if (!connectedDevice) {
+      showStatus('Please connect to your TV first 👆');
+      onOpenDeviceManager();
+      return;
+    }
+
     const found = PRESET_APPS.find((a) => a.id === appId) || {
       id: appId,
       name: appId,
@@ -379,7 +386,7 @@ export function GoogleTVRemote({
       heroColor: 'from-slate-900 to-black',
     };
     onLaunchApp(found);
-    showStatus(`Opening ${found.shortLabel}...`);
+    showStatus(`Opening ${found.shortLabel} on TV...`);
   };
 
   // Trackpad swipe handlers

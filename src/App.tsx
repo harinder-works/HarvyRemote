@@ -271,11 +271,27 @@ export default function App() {
 
   return (
     <div
-      className={`relative w-full min-h-screen select-none ${
-        isPip
-          ? 'bg-transparent'
-          : 'bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D]'
-      } overflow-hidden flex items-center justify-center`}
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.remote-draggable-container') && !target.closest('button') && !target.closest('.modal-content')) {
+          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
+            try {
+              (window as any).AndroidNativeBridge.enterPip();
+            } catch {}
+          }
+        }
+      }}
+      onTouchStart={(e) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.remote-draggable-container') && !target.closest('button') && !target.closest('.modal-content')) {
+          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
+            try {
+              (window as any).AndroidNativeBridge.enterPip();
+            } catch {}
+          }
+        }
+      }}
+      className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center"
     >
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
