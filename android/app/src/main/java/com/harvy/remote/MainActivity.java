@@ -1,15 +1,20 @@
 package com.harvy.remote;
 
+import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
+import android.app.RemoteAction;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Rational;
-import android.view.Gravity;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -17,10 +22,24 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MainActivity extends BridgeActivity {
 
+    private static final String TAG = "MainActivity";
+    private static final String ACTION_PIP_POWER = "com.harvy.remote.PIP_POWER";
+    private static final String ACTION_PIP_OK = "com.harvy.remote.PIP_OK";
+    private static final String ACTION_PIP_VOL_UP = "com.harvy.remote.PIP_VOL_UP";
+    private static final String ACTION_PIP_VOL_DOWN = "com.harvy.remote.PIP_VOL_DOWN";
+
     private boolean isLaunchedFromExpand = false;
-    private FloatingRemoteManager floatingManager;
+    private NativeTVManager tvManager;
+    private BroadcastReceiver pipReceiver;
+
+    private String currentBrand = "google_tv";
+    private String currentIp = "192.168.1.105";
+    private int currentPort = 6467;
 
     private void handleIntent(Intent intent) {
         if (intent != null && "EXPAND".equals(intent.getStringExtra("LAUNCH_MODE"))) {
@@ -41,22 +60,16 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             );
-            // Transparent background so wallpaper & background apps are visible
-            getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-            getWindow().setNavigationBarColor(Color.TRANSPARENT);
-            getWindow().getDecorView().setFitsSystemWindows(false);
 
-            // Allow touch events outside the remote window to pass directly to underlying apps & home screen
-            getWindow().addFlags(
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-            );
+            // Clean, solid dark background for full remote mode
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0B0F19")));
+            getWindow().setStatusBarColor(Color.parseColor("#0B0F19"));
+            getWindow().setNavigationBarColor(Color.parseColor("#0B0F19"));
 
             WebView webView = getBridge().getWebView();
             if (webView != null) {
-                webView.setFitsSystemWindows(false);
-                webView.setBackgroundColor(Color.TRANSPARENT);
+                webView.setFitsSystemWindows(true);
+                webView.setBackgroundColor(Color.parseColor("#0B0F19"));
 
                 // Hardware compositing layer for 60/120fps UI
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -72,21 +85,24 @@ public class MainActivity extends BridgeActivity {
                     settings.setCacheMode(WebSettings.LOAD_DEFAULT);
                 }
 
-                NativeTVManager tvManager = new NativeTVManager(MainActivity.this, webView);
+                tvManager = new NativeTVManager(MainActivity.this, webView);
                 webView.addJavascriptInterface(tvManager, "NativeTVManager");
 
-                floatingManager = FloatingRemoteManager.getInstance();
-                floatingManager.init(MainActivity.this, tvManager);
+                registerPipReceiver();
 
                 webView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enterPip() {
-                        startFloatingRemote();
+                        MainActivity.this.enterPip();
                     }
 
                     @JavascriptInterface
                     public void exitPip() {
-                        hideFloatingRemote();
+                        runOnUiThread(() -> {
+                            Intent intent = new Intent(MainActivity.this, MainActivity.class);
+                            intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                            startActivity(intent);
+                        });
                     }
 
                     @JavascriptInterface
@@ -98,44 +114,37 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
-                    public void openAppDetailsSettings() {
-                        if (floatingManager != null) {
-                            floatingManager.openAppDetailsSettings();
-                        }
-                    }
-
-                    @JavascriptInterface
                     public void startFloatingRemote() {
-                        isLaunchedFromExpand = false;
-                        floatingManager.showFloatingRemote();
+                        MainActivity.this.enterPip();
                     }
 
                     @JavascriptInterface
                     public void hideFloatingRemote() {
-                        floatingManager.hideFloatingRemote();
+                        // no-op in native PiP
                     }
 
                     @JavascriptInterface
                     public boolean hasOverlayPermission() {
-                        return floatingManager.canDrawOverlays();
+                        return true;
                     }
 
                     @JavascriptInterface
                     public void requestOverlayPermission() {
-                        floatingManager.requestOverlayPermission();
+                        // Zero overlay permission required: directly trigger Picture-in-Picture!
+                        MainActivity.this.enterPip();
                     }
 
                     @JavascriptInterface
                     public void updateFloatingDeviceInfo(String brand, String ip, int port, String name) {
-                        floatingManager.updateDeviceInfo(brand, ip, port, name);
+                        currentBrand = brand;
+                        currentIp = ip;
+                        currentPort = port;
                     }
 
                     @JavascriptInterface
                     public void setWindowMode(String mode) {
                         if ("mini".equalsIgnoreCase(mode)) {
-                            startFloatingRemote();
-                        } else {
-                            hideFloatingRemote();
+                            MainActivity.this.enterPip();
                         }
                     }
 
@@ -146,47 +155,55 @@ public class MainActivity extends BridgeActivity {
 
                     @JavascriptInterface
                     public void sendAction(String brand, String ip, int port, String action) {
-                        tvManager.sendAction(brand, ip, port, action);
+                        currentBrand = brand;
+                        currentIp = ip;
+                        currentPort = port;
+                        if (tvManager != null) {
+                            tvManager.sendAction(brand, ip, port, action);
+                        }
                     }
 
                     @JavascriptInterface
                     public void startScan() {
-                        tvManager.startScan();
+                        if (tvManager != null) tvManager.startScan();
                     }
 
                     @JavascriptInterface
                     public void launchApp(String brand, String ip, int port, String appSlug) {
-                        tvManager.launchApp(brand, ip, port, appSlug);
+                        currentBrand = brand;
+                        currentIp = ip;
+                        currentPort = port;
+                        if (tvManager != null) tvManager.launchApp(brand, ip, port, appSlug);
                     }
 
                     @JavascriptInterface
                     public void fetchInstalledApps(String brand, String ip, int port) {
-                        tvManager.fetchInstalledApps(brand, ip, port);
+                        if (tvManager != null) tvManager.fetchInstalledApps(brand, ip, port);
                     }
 
                     @JavascriptInterface
                     public void pingDevice(String ip, int port) {
-                        tvManager.pingDevice(ip, port);
+                        if (tvManager != null) tvManager.pingDevice(ip, port);
                     }
 
                     @JavascriptInterface
                     public void sendTextInput(String brand, String ip, int port, String text) {
-                        tvManager.sendTextInput(brand, ip, port, text);
+                        if (tvManager != null) tvManager.sendTextInput(brand, ip, port, text);
                     }
 
                     @JavascriptInterface
                     public void startPairing(String ip) {
-                        tvManager.startPairing(ip);
+                        if (tvManager != null) tvManager.startPairing(ip);
                     }
 
                     @JavascriptInterface
                     public void submitPairingPin(String ip, String pin) {
-                        tvManager.submitPairingPin(ip, pin);
+                        if (tvManager != null) tvManager.submitPairingPin(ip, pin);
                     }
 
                     @JavascriptInterface
                     public String getDeviceSubnet() {
-                        return tvManager.getDeviceSubnet();
+                        return tvManager != null ? tvManager.getDeviceSubnet() : "192.168.1.";
                     }
 
                     @JavascriptInterface
@@ -199,33 +216,9 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
-                    public void setWindowBounds(int widthDp, int heightDp, int xDp, int yDp) {
-                        runOnUiThread(() -> {
-                            try {
-                                float density = getResources().getDisplayMetrics().density;
-                                WindowManager.LayoutParams params = getWindow().getAttributes();
-                                params.width = widthDp > 0 ? (int)(widthDp * density) : WindowManager.LayoutParams.MATCH_PARENT;
-                                params.height = heightDp > 0 ? (int)(heightDp * density) : WindowManager.LayoutParams.MATCH_PARENT;
-                                if (xDp >= 0 && yDp >= 0) {
-                                    params.gravity = Gravity.TOP | Gravity.START;
-                                    params.x = (int)(xDp * density);
-                                    params.y = (int)(yDp * density);
-                                } else {
-                                    params.gravity = Gravity.CENTER;
-                                }
-                                params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-                                getWindow().setAttributes(params);
-                            } catch (Exception ignored) {}
-                        });
-                    }
-
-                    @JavascriptInterface
                     public void closeApp() {
                         runOnUiThread(() -> {
                             try {
-                                if (floatingManager != null) {
-                                    floatingManager.hideFloatingRemote();
-                                }
                                 finishAffinity();
                             } catch (Exception e) {
                                 finish();
@@ -236,6 +229,103 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception ignored) {
         }
+    }
+
+    public void enterPip() {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+                    // Square aspect ratio for compact mini remote pebble
+                    Rational aspectRatio = new Rational(1, 1);
+                    builder.setAspectRatio(aspectRatio);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        builder.setAutoEnterEnabled(true);
+                        builder.setSeamlessResizeEnabled(true);
+                    }
+                    List<RemoteAction> actions = buildPipActions();
+                    if (actions != null && !actions.isEmpty()) {
+                        builder.setActions(actions);
+                    }
+                    enterPictureInPictureMode(builder.build());
+                } catch (Exception e) {
+                    Log.e(TAG, "enterPictureInPictureMode error", e);
+                }
+            }
+        });
+    }
+
+    private List<RemoteAction> buildPipActions() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return null;
+        }
+        List<RemoteAction> actions = new ArrayList<>();
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        try {
+            // 1. Power Action
+            Intent powerIntent = new Intent(ACTION_PIP_POWER).setPackage(getPackageName());
+            PendingIntent piPower = PendingIntent.getBroadcast(this, 101, powerIntent, flags);
+            Icon iconPower = Icon.createWithResource(this, android.R.drawable.ic_lock_power_off);
+            actions.add(new RemoteAction(iconPower, "Power", "Power", piPower));
+
+            // 2. Play / Pause OK Action
+            Intent okIntent = new Intent(ACTION_PIP_OK).setPackage(getPackageName());
+            PendingIntent piOk = PendingIntent.getBroadcast(this, 102, okIntent, flags);
+            Icon iconOk = Icon.createWithResource(this, android.R.drawable.ic_media_play);
+            actions.add(new RemoteAction(iconOk, "OK", "Play / Pause", piOk));
+
+            // 3. Vol Up Action
+            Intent volIntent = new Intent(ACTION_PIP_VOL_UP).setPackage(getPackageName());
+            PendingIntent piVol = PendingIntent.getBroadcast(this, 103, volIntent, flags);
+            Icon iconVol = Icon.createWithResource(this, android.R.drawable.ic_input_add);
+            actions.add(new RemoteAction(iconVol, "Vol +", "Volume Up", piVol));
+        } catch (Exception e) {
+            Log.w(TAG, "Error building PiP actions", e);
+        }
+
+        return actions;
+    }
+
+    private void registerPipReceiver() {
+        if (pipReceiver == null) {
+            pipReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (intent == null || intent.getAction() == null || tvManager == null) return;
+                    String action = intent.getAction();
+                    if (ACTION_PIP_POWER.equals(action)) {
+                        tvManager.sendAction(currentBrand, currentIp, currentPort, "POWER");
+                    } else if (ACTION_PIP_OK.equals(action)) {
+                        tvManager.sendAction(currentBrand, currentIp, currentPort, "SELECT");
+                    } else if (ACTION_PIP_VOL_UP.equals(action)) {
+                        tvManager.sendAction(currentBrand, currentIp, currentPort, "VOLUME_UP");
+                    } else if (ACTION_PIP_VOL_DOWN.equals(action)) {
+                        tvManager.sendAction(currentBrand, currentIp, currentPort, "VOLUME_DOWN");
+                    }
+                }
+            };
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(ACTION_PIP_POWER);
+            filter.addAction(ACTION_PIP_OK);
+            filter.addAction(ACTION_PIP_VOL_UP);
+            filter.addAction(ACTION_PIP_VOL_DOWN);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(pipReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(pipReceiver, filter);
+            }
+        }
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // Automatically enter Picture-in-Picture when user presses Home or switches apps (Like YouTube & Hotstar!)
+        enterPip();
     }
 
     @Override
@@ -260,31 +350,34 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        if (floatingManager != null) {
-            boolean hasPermission = floatingManager.canDrawOverlays();
-            WebView webView = getBridge().getWebView();
-            if (webView != null) {
-                webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: " + hasPermission + " } }));",
-                    null
-                );
-            }
+        WebView webView = getBridge().getWebView();
+        if (webView != null) {
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('overlay-permission-status', { detail: { granted: true } }));",
+                null
+            );
         }
-    }
-
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
-            // User touched outside the remote on an underlying app or home screen
-            moveTaskToBack(true);
-            return false;
-        }
-        return super.onTouchEvent(event);
     }
 
     @Override
     public void onBackPressed() {
-        super.onBackPressed();
-        finish();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            super.onBackPressed();
+            finish();
+        } else {
+            // User pressed Back in full remote: enter PiP mode like YouTube and Hotstar!
+            enterPip();
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (pipReceiver != null) {
+            try {
+                unregisterReceiver(pipReceiver);
+            } catch (Exception ignored) {}
+            pipReceiver = null;
+        }
     }
 }

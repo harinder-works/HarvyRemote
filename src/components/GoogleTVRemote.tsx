@@ -472,14 +472,14 @@ export function GoogleTVRemote({
                 )}
               </button>
 
-              {/* Float over other apps (Mini Remote) */}
+              {/* Picture-in-Picture Mini Remote */}
               <button
                 type="button"
                 onClick={() => {
                   sound.playClick('action');
                   onSwitchToMini();
                 }}
-                title="Float over other apps (Mini Remote)"
+                title="Picture-in-Picture Mini Remote"
                 className="w-9 h-9 rounded-xl bg-[#DEE2E8] hover:bg-[#D5DAE1] border border-[#CBD1DA] text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-sm flex items-center justify-center active:scale-95"
               >
                 <Minimize2 className="w-4 h-4 stroke-[2]" />

@@ -68,27 +68,29 @@ export default function App() {
     };
   }, []);
 
-  // Enter Mini / Floating remote
+  // Enter Mini / Picture-in-Picture remote
   const handleEnterMini = () => {
     sound.playClick('action');
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.startFloatingRemote) {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
       try {
-        (window as any).AndroidNativeBridge.startFloatingRemote();
+        (window as any).AndroidNativeBridge.enterPip();
+        return;
       } catch (e) {
-        console.error('Android startFloatingRemote error:', e);
+        console.error('Android enterPip error:', e);
       }
     }
     setRemoteMode('mini');
   };
 
-  // Exit Mini / Floating remote and expand to Full Remote
+  // Exit Mini / Picture-in-Picture remote and expand to Full Remote
   const handleExitMini = () => {
     sound.playClick('action');
-    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.hideFloatingRemote) {
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.exitPip) {
       try {
-        (window as any).AndroidNativeBridge.hideFloatingRemote();
+        (window as any).AndroidNativeBridge.exitPip();
+        return;
       } catch (e) {
-        console.error('Android hideFloatingRemote error:', e);
+        console.error('Android exitPip error:', e);
       }
     }
     setRemoteMode('full');
@@ -269,27 +271,11 @@ export default function App() {
 
   return (
     <div
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.remote-draggable-container') && !target.closest('button')) {
-          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.moveTaskToBack) {
-            try {
-              (window as any).AndroidNativeBridge.moveTaskToBack();
-            } catch {}
-          }
-        }
-      }}
-      onTouchStart={(e) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.remote-draggable-container') && !target.closest('button')) {
-          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.moveTaskToBack) {
-            try {
-              (window as any).AndroidNativeBridge.moveTaskToBack();
-            } catch {}
-          }
-        }
-      }}
-      className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center"
+      className={`relative w-full min-h-screen select-none ${
+        isPip
+          ? 'bg-transparent'
+          : 'bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#05070D]'
+      } overflow-hidden flex items-center justify-center`}
     >
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
@@ -334,6 +320,7 @@ export default function App() {
         <MiniRemote
           isOpen={true}
           theme={theme}
+          isPip={isPip}
           onExpand={handleExitMini}
           onSelectPress={handleSelectPress}
           onPowerPress={handlePowerPress}

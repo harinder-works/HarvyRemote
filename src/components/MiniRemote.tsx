@@ -32,6 +32,7 @@ interface MiniRemoteProps {
 
 export function MiniRemote({
   isOpen,
+  isPip,
   onExpand,
   onSelectPress,
   onMutePress,
@@ -332,6 +333,14 @@ export function MiniRemote({
       </div>
     </div>
   );
+
+  if (isPip) {
+    return (
+      <div className="w-full h-full min-h-screen flex items-center justify-center p-1 bg-[#0B0F19] select-none overflow-hidden">
+        {pebbleContent}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden select-none bg-transparent">
