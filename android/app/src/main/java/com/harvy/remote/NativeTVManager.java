@@ -51,6 +51,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -93,12 +95,16 @@ public class NativeTVManager {
     // Persistent live remote socket to Google TV (Port 6466) for instant, low-latency keypresses
     private SSLSocket activeRemoteSocket = null;
     private String activeRemoteIp = null;
+    private volatile long lastSocketActivityTime = 0;
+    private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
 
     public NativeTVManager(Context context, WebView webView) {
         this.context = context;
         this.webView = webView;
         // Warm up SSL context and keystore in background thread
         commandExecutor.submit(this::initGtvSslContext);
+        // Start background socket keep-alive heartbeat every 10 seconds to maintain persistent connection
+        heartbeatExecutor.scheduleWithFixedDelay(this::keepAliveHeartbeat, 10, 10, TimeUnit.SECONDS);
     }
 
     /**
@@ -453,7 +459,20 @@ public class NativeTVManager {
     private synchronized SSLSocket getOrCreateRemoteSocket(String ip) {
         try {
             if (activeRemoteSocket != null && !activeRemoteSocket.isClosed() && ip.equals(activeRemoteIp)) {
-                return activeRemoteSocket;
+                long idle = System.currentTimeMillis() - lastSocketActivityTime;
+                // If the socket was used recently, it's immediately warm
+                if (idle < 20000) {
+                    return activeRemoteSocket;
+                }
+                // Verify socket is not closed or reset by peer
+                try {
+                    activeRemoteSocket.sendUrgentData(0xFF);
+                    return activeRemoteSocket;
+                } catch (Exception dead) {
+                    Log.d(TAG, "Socket to " + ip + " was dead, reconnecting cleanly: " + dead.getMessage());
+                    try { activeRemoteSocket.close(); } catch (Exception ignored) {}
+                    activeRemoteSocket = null;
+                }
             }
 
             if (activeRemoteSocket != null) {
@@ -467,8 +486,8 @@ public class NativeTVManager {
             SSLSocket socket = (SSLSocket) sc.getSocketFactory().createSocket();
             socket.setTcpNoDelay(true);
             socket.setKeepAlive(true);
-            socket.setSoTimeout(4000);
-            socket.connect(new InetSocketAddress(ip, 6466), 2500);
+            socket.setSoTimeout(2500);
+            socket.connect(new InetSocketAddress(ip, 6466), 1500);
             socket.startHandshake();
 
             InputStream is = socket.getInputStream();
@@ -495,12 +514,39 @@ public class NativeTVManager {
                 activeRemoteSocket.setSoTimeout(0); // Long-lived remote key session
             } catch (Exception ex) {}
             activeRemoteIp = ip;
+            lastSocketActivityTime = System.currentTimeMillis();
             Log.d(TAG, "Active remote session established on Port 6466 with " + ip);
             return activeRemoteSocket;
         } catch (Exception e) {
             Log.w(TAG, "Could not open remote session to " + ip + ":6466: " + e.getMessage());
             return null;
         }
+    }
+
+    private void keepAliveHeartbeat() {
+        if (activeRemoteSocket != null && !activeRemoteSocket.isClosed() && activeRemoteIp != null) {
+            try {
+                byte[] ping = buildRemotePingMessage();
+                sendLengthPrefixed(activeRemoteSocket.getOutputStream(), ping);
+                lastSocketActivityTime = System.currentTimeMillis();
+            } catch (Exception e) {
+                try { activeRemoteSocket.close(); } catch (Exception ex) {}
+                activeRemoteSocket = null;
+            }
+        }
+    }
+
+    private byte[] buildRemotePingMessage() throws IOException {
+        ByteArrayOutputStream ping = new ByteArrayOutputStream();
+        ping.write(0x08); // field 1: val1 = 1
+        writeVarint(ping, 1);
+        byte[] pingBytes = ping.toByteArray();
+
+        ByteArrayOutputStream outer = new ByteArrayOutputStream();
+        outer.write(0x3A); // field 7: remote_ping_request ((7 << 3) | 2 = 58 = 0x3A)
+        writeVarint(outer, pingBytes.length);
+        outer.write(pingBytes);
+        return outer.toByteArray();
     }
 
     private boolean sendGoogleTvKey(String ip, int keycode) {
@@ -514,6 +560,7 @@ public class NativeTVManager {
                 OutputStream os = socket.getOutputStream();
                 byte[] keyMsg = buildRemoteKeyInjectMessage(keycode, 3); // 3 = SHORT
                 sendLengthPrefixed(os, keyMsg);
+                lastSocketActivityTime = System.currentTimeMillis();
                 return true;
             } catch (Exception e) {
                 Log.w(TAG, "sendGoogleTvKey failed on attempt " + attempt + ", resetting socket: " + e.getMessage());

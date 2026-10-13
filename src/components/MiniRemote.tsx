@@ -10,6 +10,7 @@ import {
 import { sound } from '../utils/audio';
 import { RemoteTheme } from '../types/remote';
 import { SmartTVDevice } from '../utils/universalTVProtocol';
+import { useTactilePress } from '../utils/useTactilePress';
 
 interface MiniRemoteProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ export function MiniRemote({
   connectedDevice,
 }: MiniRemoteProps) {
   if (!isOpen) return null;
+
+  const bindTactile = useTactilePress();
 
   // Safe screen boundary helpers (Pebble width is 154px, height is ~140px)
   const PEBBLE_WIDTH = 154;
@@ -230,13 +233,12 @@ export function MiniRemote({
           {/* Power Button */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
+            {...bindTactile('mini-power', () => {
               sound.playClick('action');
               onPowerPress();
-            }}
+            })}
             title="TV Power"
-            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-emerald-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-emerald-600 transition-colors active:scale-95 cursor-pointer touch-manipulation tactile-btn shadow-sm"
           >
             <Power className="w-3.5 h-3.5 stroke-[2]" />
           </button>
@@ -244,13 +246,12 @@ export function MiniRemote({
           {/* Expand to Full Remote Button */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
+            {...bindTactile('mini-expand', () => {
               sound.playClick('action');
               onExpand();
-            }}
+            })}
             title="Expand to Full Remote"
-            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-[#D8DCE2] border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer touch-manipulation tactile-btn shadow-sm"
           >
             <Maximize2 className="w-3.5 h-3.5 stroke-[2]" />
           </button>
@@ -258,13 +259,12 @@ export function MiniRemote({
           {/* Close Remote Button */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
+            {...bindTactile('mini-close', () => {
               sound.playClick('soft');
               onCloseApp?.();
-            }}
+            })}
             title="Close Remote & Exit"
-            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-rose-100 border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors active:scale-95 cursor-pointer touch-manipulation shadow-sm"
+            className="w-7 h-7 rounded-xl bg-[#E1E5EA] hover:bg-rose-100 border border-[#D0D5DC] flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors active:scale-95 cursor-pointer touch-manipulation tactile-btn shadow-sm"
           >
             <X className="w-3.5 h-3.5 stroke-[2]" />
           </button>
@@ -274,13 +274,12 @@ export function MiniRemote({
       {/* 2. Main Play / Pause (OK Button) */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
+        {...bindTactile('mini-ok', () => {
           sound.playClick('action');
           onSelectPress();
-        }}
+        })}
         title="Play / Pause (OK / Select)"
-        className="w-full h-11 mb-2 rounded-2xl bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-slate-200 active:to-slate-300 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center gap-1.5 cursor-pointer text-slate-700 font-semibold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
+        className="w-full h-11 mb-2 rounded-2xl bg-gradient-to-b from-[#FAFBFD] to-[#E2E6EC] hover:from-[#F0F3F7] hover:to-[#D9DFE6] active:from-slate-200 active:to-slate-300 border border-[#CBD1DB] shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] flex items-center justify-center gap-1.5 cursor-pointer text-slate-700 font-semibold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5 tactile-btn"
       >
         <Play className="w-3 h-3 fill-slate-700 text-slate-700 ml-0.5" />
         <span>OK</span>
@@ -292,13 +291,12 @@ export function MiniRemote({
         {/* Volume Down */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+          {...bindTactile('mini-vol-down', () => {
             sound.playClick('dpad');
             onVolumeChange(-5);
-          }}
+          }, { repeatable: true })}
           title="Volume Down (−)"
-          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
         >
           −
         </button>
@@ -306,13 +304,12 @@ export function MiniRemote({
         {/* Mute */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+          {...bindTactile('mini-mute', () => {
             sound.playClick('button');
             onMutePress();
-          }}
+          })}
           title="Mute Audio"
-          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
         >
           <VolumeX className="w-4 h-4 stroke-[2]" />
         </button>
@@ -320,13 +317,12 @@ export function MiniRemote({
         {/* Volume Up */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+          {...bindTactile('mini-vol-up', () => {
             sound.playClick('dpad');
             onVolumeChange(5);
-          }}
+          }, { repeatable: true })}
           title="Volume Up (+)"
-          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none"
+          className="h-9 rounded-xl bg-[#E4E8EE] hover:bg-[#D9DEE5] active:bg-slate-200 border border-[#CBD1DB] shadow-sm flex items-center justify-center active:scale-95 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
         >
           +
         </button>

@@ -9,6 +9,14 @@
   -webkit-user-drag: none;
 }
 
+button, [role="button"], .tactile-btn {
+  touch-action: manipulation !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 @layer base {
   body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

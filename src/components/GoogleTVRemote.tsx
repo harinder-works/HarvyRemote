@@ -16,6 +16,7 @@ import {
 import { AppShortcut, RemoteTheme } from '../types/remote';
 import { sound } from '../utils/audio';
 import { SmartTVDevice } from '../utils/universalTVProtocol';
+import { useTactilePress } from '../utils/useTactilePress';
 
 interface GoogleTVRemoteProps {
   theme?: RemoteTheme;
@@ -50,6 +51,7 @@ export function GoogleTVRemote({
   onCloseApp,
   connectedDevice,
 }: GoogleTVRemoteProps) {
+  const bindTactile = useTactilePress();
   // Sleek remote pebble width (224px)
   const REMOTE_WIDTH = 224;
   const REMOTE_HEIGHT = 440;
@@ -406,9 +408,9 @@ export function GoogleTVRemote({
             {/* TV Device Connection Pill Button */}
             <button
               type="button"
-              onClick={onOpenDeviceManager}
+              {...bindTactile('btn-device', onOpenDeviceManager)}
               title={connectedDevice ? `Connected to ${connectedDevice.name}` : 'Pair Smart TV'}
-              className="h-8 px-2.5 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] text-[10.5px] font-semibold text-slate-700 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center gap-1.5 active:scale-95"
+              className="h-8 px-2.5 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] text-[10.5px] font-semibold text-slate-700 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center gap-1.5 active:scale-95 touch-manipulation tactile-btn"
             >
               <span
                 className={`w-2 h-2 shrink-0 rounded-full ${
@@ -425,12 +427,12 @@ export function GoogleTVRemote({
               {/* Mode Switch (D-Pad vs Swipe Trackpad) */}
               <button
                 type="button"
-                onClick={() => {
+                {...bindTactile('btn-mode', () => {
                   sound.playClick('button');
                   setControlMode((m) => (m === 'dpad' ? 'trackpad' : 'dpad'));
-                }}
+                })}
                 title={controlMode === 'dpad' ? 'Switch to Trackpad' : 'Switch to D-Pad'}
-                className="w-8 h-8 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center active:scale-95"
+                className="w-8 h-8 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center active:scale-95 touch-manipulation tactile-btn"
               >
                 {controlMode === 'dpad' ? (
                   <MousePointer className="w-3.5 h-3.5 stroke-[2]" />
@@ -442,12 +444,12 @@ export function GoogleTVRemote({
               {/* Picture-in-Picture Mini Remote */}
               <button
                 type="button"
-                onClick={() => {
+                {...bindTactile('btn-mini', () => {
                   sound.playClick('action');
                   onSwitchToMini();
-                }}
+                })}
                 title="Mini Remote"
-                className="w-8 h-8 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center active:scale-95"
+                className="w-8 h-8 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center active:scale-95 touch-manipulation tactile-btn"
               >
                 <Minimize2 className="w-3.5 h-3.5 stroke-[2]" />
               </button>
@@ -455,12 +457,12 @@ export function GoogleTVRemote({
               {/* Close Button */}
               <button
                 type="button"
-                onClick={() => {
+                {...bindTactile('btn-close', () => {
                   sound.playClick('soft');
                   onCloseApp?.();
-                }}
+                })}
                 title="Close Remote"
-                className="w-8 h-8 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-[#CBD2DC] text-slate-700 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center active:scale-95"
+                className="w-8 h-8 rounded-xl bg-gradient-to-b from-white to-[#E7EBF0] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-[#CBD2DC] text-slate-700 transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center justify-center active:scale-95 touch-manipulation tactile-btn"
               >
                 <X className="w-3.5 h-3.5 stroke-[2.2]" />
               </button>
@@ -478,9 +480,9 @@ export function GoogleTVRemote({
           <div className="grid grid-cols-3 gap-1.5 px-0.5 mb-2">
             <button
               type="button"
-              onClick={handlePower}
+              {...bindTactile('btn-power', handlePower)}
               title="TV Power"
-              className="h-9 rounded-xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-emerald-50 hover:text-emerald-600 hover:border-emerald-300 border border-[#CBD2DC] flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-9 rounded-xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-emerald-50 hover:text-emerald-600 hover:border-emerald-300 border border-[#CBD2DC] flex items-center justify-center text-slate-700 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <Power className="w-4 h-4 stroke-[2.2]" />
             </button>
@@ -488,9 +490,9 @@ export function GoogleTVRemote({
             {/* USB Media Button */}
             <button
               type="button"
-              onClick={handleUsb}
+              {...bindTactile('btn-usb', handleUsb)}
               title="USB Media"
-              className="h-9 rounded-xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-9 rounded-xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <Usb className="w-3.5 h-3.5 stroke-[2.2]" />
               <span className="text-[10px] font-bold">USB</span>
@@ -498,9 +500,9 @@ export function GoogleTVRemote({
 
             <button
               type="button"
-              onClick={handleMute}
+              {...bindTactile('btn-mute', handleMute)}
               title="Mute Audio"
-              className="h-9 rounded-xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-9 rounded-xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <VolumeX className="w-4 h-4 stroke-[2.2]" />
             </button>
@@ -514,13 +516,9 @@ export function GoogleTVRemote({
                 {/* UP KEY */}
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDpad('up');
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
+                  {...bindTactile('dpad-up', () => handleDpad('up'), { repeatable: true })}
                   title="Navigate Up"
-                  className="w-[66px] h-[42px] mb-1.5 rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  className="w-[66px] h-[42px] mb-1.5 rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
                 >
                   <ChevronUp className="w-5 h-5 stroke-[2.4]" />
                 </button>
@@ -530,13 +528,9 @@ export function GoogleTVRemote({
                   {/* LEFT KEY */}
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDpad('left');
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
+                    {...bindTactile('dpad-left', () => handleDpad('left'), { repeatable: true })}
                     title="Navigate Left"
-                    className="w-[60px] h-[42px] rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                    className="w-[60px] h-[42px] rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
                   >
                     <ChevronLeft className="w-5 h-5 stroke-[2.4]" />
                   </button>
@@ -544,13 +538,9 @@ export function GoogleTVRemote({
                   {/* CENTER OK BUTTON */}
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelect();
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
+                    {...bindTactile('dpad-ok', handleSelect)}
                     title="Select / OK"
-                    className="w-[66px] h-[42px] rounded-2xl bg-gradient-to-b from-[#FFFFFF] via-[#FAFBFD] to-[#D9DFE8] hover:from-white hover:to-[#CED5E0] active:from-slate-200 active:to-slate-300 border border-[#BAC3CF] shadow-[0_2px_5px_rgba(0,0,0,0.08),0_1px_0_rgba(255,255,255,0.95)_inset] flex items-center justify-center cursor-pointer text-slate-900 font-bold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5"
+                    className="w-[66px] h-[42px] rounded-2xl bg-gradient-to-b from-[#FFFFFF] via-[#FAFBFD] to-[#D9DFE8] hover:from-white hover:to-[#CED5E0] active:from-slate-200 active:to-slate-300 border border-[#BAC3CF] shadow-[0_2px_5px_rgba(0,0,0,0.08),0_1px_0_rgba(255,255,255,0.95)_inset] flex items-center justify-center cursor-pointer text-slate-900 font-bold text-xs tracking-wider transition-all active:scale-95 touch-manipulation focus:outline-none ring-1 ring-black/5 tactile-btn"
                   >
                     OK
                   </button>
@@ -558,13 +548,9 @@ export function GoogleTVRemote({
                   {/* RIGHT KEY */}
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDpad('right');
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
+                    {...bindTactile('dpad-right', () => handleDpad('right'), { repeatable: true })}
                     title="Navigate Right"
-                    className="w-[60px] h-[42px] rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                    className="w-[60px] h-[42px] rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
                   >
                     <ChevronRight className="w-5 h-5 stroke-[2.4]" />
                   </button>
@@ -573,13 +559,9 @@ export function GoogleTVRemote({
                 {/* DOWN KEY */}
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDpad('down');
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
+                  {...bindTactile('dpad-down', () => handleDpad('down'), { repeatable: true })}
                   title="Navigate Down"
-                  className="w-[66px] h-[42px] mt-1.5 rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none"
+                  className="w-[66px] h-[42px] mt-1.5 rounded-2xl bg-gradient-to-b from-white to-[#E5E9F0] hover:from-white hover:to-[#DCE1E8] active:from-slate-200 active:to-slate-300 border border-[#CBD2DC] shadow-[0_2px_4px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.9)_inset] flex items-center justify-center text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer touch-manipulation focus:outline-none tactile-btn"
                 >
                   <ChevronDown className="w-5 h-5 stroke-[2.4]" />
                 </button>
@@ -602,9 +584,9 @@ export function GoogleTVRemote({
           <div className="grid grid-cols-2 gap-1.5 w-full my-1.5 px-0.5">
             <button
               type="button"
-              onClick={handleBack}
+              {...bindTactile('btn-back', handleBack)}
               title="Back"
-              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
               <span className="text-[11.5px] font-semibold">Back</span>
@@ -612,9 +594,9 @@ export function GoogleTVRemote({
 
             <button
               type="button"
-              onClick={handleHome}
+              {...bindTactile('btn-home', handleHome)}
               title="Home"
-              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <Home className="w-4 h-4 stroke-[2.2]" />
               <span className="text-[11.5px] font-semibold">Home</span>
@@ -625,9 +607,9 @@ export function GoogleTVRemote({
           <div className="grid grid-cols-2 gap-1.5 w-full mb-1 px-0.5">
             <button
               type="button"
-              onClick={() => handleVolume(-5)}
+              {...bindTactile('vol-down', () => handleVolume(-5), { repeatable: true })}
               title="Volume Down (−)"
-              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <span className="text-base leading-none font-bold text-slate-600">−</span>
               <span className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">Vol</span>
@@ -635,9 +617,9 @@ export function GoogleTVRemote({
 
             <button
               type="button"
-              onClick={() => handleVolume(5)}
+              {...bindTactile('vol-up', () => handleVolume(5), { repeatable: true })}
               title="Volume Up (+)"
-              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset]"
+              className="h-10 rounded-2xl bg-gradient-to-b from-white to-[#E6EAF0] hover:from-white hover:to-[#DDE2E9] border border-[#CBD2DC] flex items-center justify-center gap-1.5 text-slate-700 hover:text-slate-900 transition-all active:scale-95 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.8)_inset] touch-manipulation tactile-btn"
             >
               <span className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">Vol</span>
               <span className="text-base leading-none font-bold text-slate-600">+</span>

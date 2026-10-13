@@ -357,26 +357,17 @@ public class FloatingRemoteManager {
 
         // Mode switch button: switches between Full Remote and Mini Remote
         Button btnToggle = createIconButton(ctx, isFullMode ? "🗕 Mini" : "⛶ Full", Color.parseColor("#475569"), isFullMode ? dpToPx(48) : dpToPx(44));
-        btnToggle.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            toggleMode();
-        });
+        setTactilePress(btnToggle, this::toggleMode);
         header.addView(btnToggle);
 
         // Open Main App Button
         Button btnExpand = createIconButton(ctx, "↗", Color.parseColor("#0284C7"), dpToPx(24));
-        btnExpand.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            openMainApp();
-        });
+        setTactilePress(btnExpand, this::openMainApp);
         header.addView(btnExpand);
 
         // Close Button
         Button btnClose = createIconButton(ctx, "✕", Color.parseColor("#475569"), dpToPx(24));
-        btnClose.setOnClickListener(v -> {
-            vibrateTap(ctx);
-            hideFloatingRemote();
-        });
+        setTactilePress(btnClose, this::hideFloatingRemote);
         header.addView(btnClose);
 
         card.addView(header);
@@ -390,24 +381,15 @@ public class FloatingRemoteManager {
             hwRow.setPadding(0, 0, 0, dpToPx(4));
 
             Button btnPower = createActionButton(ctx, "⏻", 13, Color.parseColor("#0F172A"));
-            btnPower.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("POWER");
-            });
+            setTactilePress(btnPower, () -> sendAction("POWER"));
             hwRow.addView(btnPower);
 
             Button btnUsb = createActionButton(ctx, "🖴 USB", 10.5f, Color.parseColor("#0F172A"));
-            btnUsb.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("USB_MEDIA");
-            });
+            setTactilePress(btnUsb, () -> sendAction("USB_MEDIA"));
             hwRow.addView(btnUsb);
 
             Button btnMute = createActionButton(ctx, "🔇", 13, Color.parseColor("#0F172A"));
-            btnMute.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("MUTE");
-            });
+            setTactilePress(btnMute, () -> sendAction("MUTE"));
             hwRow.addView(btnMute);
 
             card.addView(hwRow);
@@ -420,10 +402,7 @@ public class FloatingRemoteManager {
 
             // Up Button
             Button btnUp = createDirectionalButton(ctx, "▲");
-            btnUp.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_UP");
-            });
+            setTactilePress(btnUp, () -> sendAction("DPAD_UP"));
             dpadContainer.addView(btnUp);
 
             // Middle Row: Left, Center OK, Right
@@ -433,34 +412,22 @@ public class FloatingRemoteManager {
             midRow.setPadding(0, dpToPx(3), 0, dpToPx(3));
 
             Button btnLeft = createDirectionalButton(ctx, "◀");
-            btnLeft.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_LEFT");
-            });
+            setTactilePress(btnLeft, () -> sendAction("DPAD_LEFT"));
             midRow.addView(btnLeft);
 
             Button btnOk = createOkButton(ctx);
-            btnOk.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("SELECT");
-            });
+            setTactilePress(btnOk, () -> sendAction("SELECT"));
             midRow.addView(btnOk);
 
             Button btnRight = createDirectionalButton(ctx, "▶");
-            btnRight.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_RIGHT");
-            });
+            setTactilePress(btnRight, () -> sendAction("DPAD_RIGHT"));
             midRow.addView(btnRight);
 
             dpadContainer.addView(midRow);
 
             // Down Button
             Button btnDown = createDirectionalButton(ctx, "▼");
-            btnDown.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("DPAD_DOWN");
-            });
+            setTactilePress(btnDown, () -> sendAction("DPAD_DOWN"));
             dpadContainer.addView(btnDown);
 
             card.addView(dpadContainer);
@@ -472,17 +439,11 @@ public class FloatingRemoteManager {
             navRow.setPadding(0, 0, 0, dpToPx(3));
 
             Button btnBack = createActionButton(ctx, "⮌ Back", 10.5f, Color.parseColor("#1E293B"));
-            btnBack.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("BACK");
-            });
+            setTactilePress(btnBack, () -> sendAction("BACK"));
             navRow.addView(btnBack);
 
             Button btnHome = createActionButton(ctx, "⌂ Home", 10.5f, Color.parseColor("#1E293B"));
-            btnHome.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("HOME");
-            });
+            setTactilePress(btnHome, () -> sendAction("HOME"));
             navRow.addView(btnHome);
 
             card.addView(navRow);
@@ -494,17 +455,11 @@ public class FloatingRemoteManager {
             volRow.setPadding(0, 0, 0, dpToPx(4));
 
             Button btnVolDown = createActionButton(ctx, "−  VOL", 10.5f, Color.parseColor("#1E293B"));
-            btnVolDown.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("VOLUME_DOWN");
-            });
+            setTactilePress(btnVolDown, () -> sendAction("VOLUME_DOWN"));
             volRow.addView(btnVolDown);
 
             Button btnVolUp = createActionButton(ctx, "VOL  +", 10.5f, Color.parseColor("#1E293B"));
-            btnVolUp.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("VOLUME_UP");
-            });
+            setTactilePress(btnVolUp, () -> sendAction("VOLUME_UP"));
             volRow.addView(btnVolUp);
 
             card.addView(volRow);
@@ -515,10 +470,7 @@ public class FloatingRemoteManager {
             LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(34));
             pLp.setMargins(0, 0, 0, dpToPx(4));
             btnPower.setLayoutParams(pLp);
-            btnPower.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("POWER");
-            });
+            setTactilePress(btnPower, () -> sendAction("POWER"));
             card.addView(btnPower);
 
             Button btnOk = createOkButton(ctx);
@@ -526,10 +478,7 @@ public class FloatingRemoteManager {
             okLp.setMargins(0, 0, 0, dpToPx(4));
             btnOk.setLayoutParams(okLp);
             btnOk.setText("▶  OK  ❚❚");
-            btnOk.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("SELECT");
-            });
+            setTactilePress(btnOk, () -> sendAction("SELECT"));
             card.addView(btnOk);
 
             LinearLayout volRow = new LinearLayout(ctx);
@@ -538,30 +487,53 @@ public class FloatingRemoteManager {
             volRow.setPadding(0, 0, 0, dpToPx(2));
 
             Button btnVolDown = createActionButton(ctx, "−", 14, Color.parseColor("#1E293B"));
-            btnVolDown.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("VOLUME_DOWN");
-            });
+            setTactilePress(btnVolDown, () -> sendAction("VOLUME_DOWN"));
             volRow.addView(btnVolDown);
 
             Button btnMute = createActionButton(ctx, "🔇", 11, Color.parseColor("#1E293B"));
-            btnMute.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("MUTE");
-            });
+            setTactilePress(btnMute, () -> sendAction("MUTE"));
             volRow.addView(btnMute);
 
             Button btnVolUp = createActionButton(ctx, "+", 14, Color.parseColor("#1E293B"));
-            btnVolUp.setOnClickListener(v -> {
-                vibrateTap(ctx);
-                sendAction("VOLUME_UP");
-            });
+            setTactilePress(btnVolUp, () -> sendAction("VOLUME_UP"));
             volRow.addView(btnVolUp);
 
             card.addView(volRow);
         }
 
         return card;
+    }
+
+    private void setTactilePress(Button btn, Runnable action) {
+        btn.setOnTouchListener(new View.OnTouchListener() {
+            private boolean isDown = false;
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        isDown = true;
+                        if (v.getParent() != null) {
+                            v.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                        vibrateTap(btn.getContext());
+                        btn.setAlpha(0.65f);
+                        btn.setScaleX(0.96f);
+                        btn.setScaleY(0.96f);
+                        action.run();
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (isDown) {
+                            isDown = false;
+                            btn.setAlpha(1.0f);
+                            btn.setScaleX(1.0f);
+                            btn.setScaleY(1.0f);
+                        }
+                        return true;
+                }
+                return false;
+            }
+        });
     }
 
     private Button createDirectionalButton(Context ctx, String text) {
