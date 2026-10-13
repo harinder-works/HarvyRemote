@@ -1,37 +1,46 @@
 import React from 'react';
-import { X, Layers, ExternalLink, HelpCircle, Smartphone } from 'lucide-react';
+import { X, Layers, ExternalLink, ShieldCheck, LayoutGrid, Sparkles } from 'lucide-react';
 import { sound } from '../utils/audio';
 
 interface OverlayPermissionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUsePip: () => void;
+  onUseInAppMini: () => void;
 }
 
 export function OverlayPermissionModal({
   isOpen,
   onClose,
-  onUsePip,
+  onUseInAppMini,
 }: OverlayPermissionModalProps) {
   if (!isOpen) return null;
 
-  const handleOpenSettings = () => {
+  // Open direct toggle for "Display over other apps"
+  const handleDirectOverlay = () => {
     sound.playClick('action');
-    const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
-    if (bridge) {
-      if (typeof bridge.openAppDetailsSettings === 'function') {
-        bridge.openAppDetailsSettings();
-      } else if (typeof bridge.requestOverlayPermission === 'function') {
-        bridge.requestOverlayPermission();
-      }
-    }
-  };
-
-  const handleDirectOverlayRequest = () => {
-    sound.playClick('button');
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
     if (bridge && typeof bridge.requestOverlayPermission === 'function') {
       bridge.requestOverlayPermission();
+    }
+  };
+
+  // Open the system list of all apps ("Appear on top" / "Display over other apps")
+  const handleOpenAppList = () => {
+    sound.playClick('action');
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
+    if (bridge && typeof bridge.openOverlaySettingsList === 'function') {
+      bridge.openOverlaySettingsList();
+    } else if (bridge && typeof bridge.requestOverlayPermission === 'function') {
+      bridge.requestOverlayPermission();
+    }
+  };
+
+  // Open App Details / App Info
+  const handleOpenAppInfo = () => {
+    sound.playClick('button');
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
+    if (bridge && typeof bridge.openAppDetailsSettings === 'function') {
+      bridge.openAppDetailsSettings();
     }
   };
 
@@ -41,15 +50,15 @@ export function OverlayPermissionModal({
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center shadow-inner">
               <Layers className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                Enable Floating Remote
+                Floating Mini Remote
               </h3>
-              <p className="text-[11px] text-slate-500">
-                Control TV over WhatsApp & other apps
+              <p className="text-[11px] text-slate-500 font-medium">
+                Float over WhatsApp, YouTube & other apps
               </p>
             </div>
           </div>
@@ -63,52 +72,52 @@ export function OverlayPermissionModal({
         </div>
 
         {/* Content */}
-        <div className="py-4 space-y-3.5 text-xs text-slate-600">
-          <p className="text-[11.5px] leading-relaxed">
-            To keep all remote buttons <strong className="text-slate-800">100% clickable</strong> while using other apps, Android requires the <strong className="text-slate-800">"Display over other apps"</strong> permission.
+        <div className="py-3.5 space-y-3 text-xs text-slate-600">
+          <p className="text-[12px] leading-relaxed">
+            To keep all remote buttons <strong className="text-slate-900">clickable</strong> while you browse other apps, Android requires the <strong className="text-slate-900">"Display over other apps"</strong> (or "Appear on top") toggle.
           </p>
 
-          {/* Android 13/14 Restricted Settings Guide */}
-          <div className="rounded-2xl bg-amber-50/80 border border-amber-200/80 p-3 space-y-2">
-            <div className="flex items-center gap-1.5 font-bold text-amber-900 text-[11.5px]">
-              <HelpCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>If it says "Restricted setting":</span>
+          <div className="rounded-2xl bg-sky-50/70 border border-sky-100 p-3 space-y-1.5 text-[11px] text-sky-900">
+            <div className="flex items-center gap-1.5 font-bold text-sky-950">
+              <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
+              <span>How to allow:</span>
             </div>
-            <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-950/80 pl-0.5 leading-normal">
-              <li>Tap <strong className="text-amber-900">Open App Info</strong> below</li>
-              <li>Tap the <strong className="text-amber-900">3 dots (⋮)</strong> in the top-right corner</li>
-              <li>Select <strong className="text-amber-900">Allow restricted settings</strong> & enter PIN</li>
-              <li>Then turn on <strong className="text-amber-900">Display over other apps</strong></li>
-            </ol>
+            <p className="leading-snug text-slate-600">
+              Tap <strong className="text-slate-900">"Open Overlay Setting"</strong> below and switch the toggle to <strong className="text-sky-700">Allow</strong> for Harvy Remote.
+            </p>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="space-y-2 pt-1">
+          {/* Primary Action: Direct Overlay Setting */}
           <button
             type="button"
-            onClick={handleOpenSettings}
+            onClick={handleDirectOverlay}
             className="w-full h-11 rounded-2xl bg-sky-600 hover:bg-sky-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
           >
             <ExternalLink className="w-4 h-4" />
-            <span>Open App Info (Tap 3 Dots)</span>
+            <span>Open Overlay Setting (1-Tap)</span>
           </button>
 
+          {/* Secondary Action: All Apps List */}
           <button
             type="button"
-            onClick={handleDirectOverlayRequest}
-            className="w-full h-9 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+            onClick={handleOpenAppList}
+            className="w-full h-9 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 font-semibold text-[11.5px] flex items-center justify-center gap-2 cursor-pointer transition-all"
           >
-            <span>Open "Display Over Other Apps" directly</span>
+            <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
+            <span>Find "Harvy Remote" in App List</span>
           </button>
 
+          {/* Fallback Option: In-App Mini Remote without any permission */}
           <button
             type="button"
-            onClick={onUsePip}
-            className="w-full h-9 rounded-2xl border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-600 font-semibold text-[11px] flex items-center justify-center gap-2 cursor-pointer transition-all"
+            onClick={onUseInAppMini}
+            className="w-full h-10 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 active:scale-[0.98] text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all mt-1"
           >
-            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-            <span>Or use Picture-in-Picture mode</span>
+            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <span>Use In-App Mini Remote (No Permission Needed)</span>
           </button>
         </div>
       </div>

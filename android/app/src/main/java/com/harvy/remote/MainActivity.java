@@ -158,6 +158,15 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     @JavascriptInterface
+                    public void openOverlaySettingsList() {
+                        runOnUiThread(() -> {
+                            if (floatingManager != null) {
+                                floatingManager.openOverlaySettingsList();
+                            }
+                        });
+                    }
+
+                    @JavascriptInterface
                     public void openAppDetailsSettings() {
                         runOnUiThread(() -> {
                             if (floatingManager != null) {
@@ -178,9 +187,17 @@ public class MainActivity extends BridgeActivity {
 
                     @JavascriptInterface
                     public void setWindowMode(String mode) {
-                        if ("mini".equalsIgnoreCase(mode)) {
-                            MainActivity.this.enterPip();
-                        }
+                        runOnUiThread(() -> {
+                            if ("mini".equalsIgnoreCase(mode)) {
+                                if (floatingManager != null && floatingManager.canDrawOverlays()) {
+                                    floatingManager.showFloatingRemote();
+                                }
+                            } else {
+                                if (floatingManager != null) {
+                                    floatingManager.hideFloatingRemote();
+                                }
+                            }
+                        });
                     }
 
                     @JavascriptInterface
@@ -359,8 +376,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        // Automatically enter Picture-in-Picture when user presses Home or switches apps (Like YouTube & Hotstar!)
-        enterPip();
+        // If user has enabled overlay permission, show the interactive floating remote over other apps
+        if (floatingManager != null && floatingManager.canDrawOverlays()) {
+            floatingManager.showFloatingRemote();
+        }
     }
 
     @Override
@@ -373,15 +392,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-        try {
-            if (isInPictureInPictureMode) {
-                // Set solid matching background so Android doesn't draw a grey letterbox
-                getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#FAFBFD")));
-            } else {
-                // Restore transparent background
-                getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            }
-        } catch (Exception ignored) {}
         WebView webView = getBridge().getWebView();
         if (webView != null) {
             webView.evaluateJavascript(
@@ -408,22 +418,19 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
-            // User touched outside the remote on home screen or another app: enter PiP mode
-            enterPip();
-            return false;
-        }
         return super.onTouchEvent(event);
     }
 
     @Override
     public void onBackPressed() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
-            super.onBackPressed();
-            finish();
+        WebView webView = getBridge().getWebView();
+        if (webView != null) {
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('android-back-pressed'));",
+                null
+            );
         } else {
-            // User pressed Back in full remote: enter PiP mode like YouTube and Hotstar!
-            enterPip();
+            super.onBackPressed();
         }
     }
 

@@ -336,11 +336,8 @@ export function MiniRemote({
 
   if (isPip) {
     return (
-      <div className="w-full h-full min-h-screen flex flex-col items-center justify-center p-1 bg-[#FAFBFD] select-none overflow-hidden text-center">
+      <div className="w-full h-full min-h-screen flex flex-col items-center justify-center p-1 bg-transparent select-none overflow-hidden text-center">
         {pebbleContent}
-        <div className="mt-1 text-[8.5px] font-semibold text-slate-500 uppercase tracking-wider">
-          Tap window for TV controls (⏻, ▶, +)
-        </div>
       </div>
     );
   }

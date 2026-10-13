@@ -118,6 +118,30 @@ public class FloatingRemoteManager {
         }
     }
 
+    public void openOverlaySettingsList() {
+        if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(intent);
+            } catch (Exception e) {
+                openAppDetailsSettings();
+            }
+        }
+    }
+
+    public void openMainApp() {
+        if (activity != null) {
+            try {
+                Intent intent = new Intent(activity, MainActivity.class);
+                intent.putExtra("LAUNCH_MODE", "EXPAND");
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                activity.startActivity(intent);
+                hideFloatingRemote();
+            } catch (Exception ignored) {}
+        }
+    }
+
     public void openAppDetailsSettings() {
         if (activity != null) {
             try {
@@ -338,6 +362,14 @@ public class FloatingRemoteManager {
             toggleMode();
         });
         header.addView(btnToggle);
+
+        // Open Main App Button
+        Button btnExpand = createIconButton(ctx, "↗", Color.parseColor("#0284C7"), dpToPx(24));
+        btnExpand.setOnClickListener(v -> {
+            vibrateTap(ctx);
+            openMainApp();
+        });
+        header.addView(btnExpand);
 
         // Close Button
         Button btnClose = createIconButton(ctx, "✕", Color.parseColor("#475569"), dpToPx(24));

@@ -147,6 +147,34 @@ export default function App() {
   // Command logs & telemetry
   const [commandLogs, setCommandLogs] = useState<UniversalCommandLog[]>([]);
 
+  // Listen for Android Back button press
+  useEffect(() => {
+    const handleAndroidBack = () => {
+      if (overlayPermissionModalOpen) {
+        setOverlayPermissionModalOpen(false);
+        return;
+      }
+      if (deviceModalOpen) {
+        setDeviceModalOpen(false);
+        return;
+      }
+      if (remoteMode === 'mini') {
+        setRemoteMode('full');
+        return;
+      }
+      // In full mode, minimize activity cleanly
+      const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
+      if (bridge && typeof bridge.moveTaskToBack === 'function') {
+        try {
+          bridge.moveTaskToBack();
+        } catch {}
+      }
+    };
+
+    window.addEventListener('android-back-pressed', handleAndroidBack);
+    return () => window.removeEventListener('android-back-pressed', handleAndroidBack);
+  }, [overlayPermissionModalOpen, deviceModalOpen, remoteMode]);
+
   // Sync remote mode and update native window bounds
   useEffect(() => {
     localStorage.setItem('gtv_remote_mode', remoteMode);
@@ -296,29 +324,7 @@ export default function App() {
   }, []);
 
   return (
-    <div
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.remote-draggable-container') && !target.closest('button') && !target.closest('.modal-content')) {
-          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
-            try {
-              (window as any).AndroidNativeBridge.enterPip();
-            } catch {}
-          }
-        }
-      }}
-      onTouchStart={(e) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.remote-draggable-container') && !target.closest('button') && !target.closest('.modal-content')) {
-          if (typeof window !== 'undefined' && (window as any).AndroidNativeBridge?.enterPip) {
-            try {
-              (window as any).AndroidNativeBridge.enterPip();
-            } catch {}
-          }
-        }
-      }}
-      className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center"
-    >
+    <div className="relative w-full min-h-screen select-none bg-transparent overflow-hidden flex items-center justify-center">
       {/* Floating Restore Button (Only if user closed remote in web preview) */}
       {isAppClosed && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">
@@ -390,14 +396,9 @@ export default function App() {
       <OverlayPermissionModal
         isOpen={overlayPermissionModalOpen}
         onClose={() => setOverlayPermissionModalOpen(false)}
-        onUsePip={() => {
+        onUseInAppMini={() => {
           setOverlayPermissionModalOpen(false);
-          const bridge = typeof window !== 'undefined' ? (window as any).AndroidNativeBridge : null;
-          if (bridge && typeof bridge.enterPip === 'function') {
-            try {
-              bridge.enterPip();
-            } catch {}
-          }
+          setRemoteMode('mini');
         }}
       />
     </div>
