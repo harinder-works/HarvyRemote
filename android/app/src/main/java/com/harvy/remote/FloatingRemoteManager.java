@@ -252,7 +252,7 @@ public class FloatingRemoteManager {
     private View createFloatingView() {
         Context ctx = activity.getApplicationContext();
 
-        int cardWidthDp = isFullMode ? 244 : 156;
+        int cardWidthDp = isFullMode ? 204 : 156;
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
         int pad = dpToPx(8);
@@ -509,16 +509,6 @@ public class FloatingRemoteManager {
 
             card.addView(volRow);
 
-            // 5. Six Streaming App Shortcuts (2 columns x 3 rows)
-            LinearLayout appRow1 = createStreamingAppRow(ctx, "YouTube", Color.parseColor("#DC2626"), "youtube", "Netflix", Color.parseColor("#E50914"), "netflix");
-            card.addView(appRow1);
-
-            LinearLayout appRow2 = createStreamingAppRow(ctx, "Hotstar", Color.parseColor("#1D4ED8"), "hotstar", "Prime Video", Color.parseColor("#0284C7"), "prime");
-            card.addView(appRow2);
-
-            LinearLayout appRow3 = createStreamingAppRow(ctx, "JioCinema", Color.parseColor("#D946EF"), "jiocinema", "Sony LIV", Color.parseColor("#2563EB"), "sonyliv");
-            card.addView(appRow3);
-
         } else {
             // MINI REMOTE MODE (Minimal: Power, Play/Pause OK, Volume Row)
             Button btnPower = createActionButton(ctx, "⏻ Power", 11, Color.parseColor("#0F172A"));
@@ -586,7 +576,7 @@ public class FloatingRemoteManager {
         bg.setStroke(dpToPx(1), Color.parseColor("#CBD5E1"));
         b.setBackground(bg);
 
-        int w = isFullMode ? dpToPx(70) : dpToPx(54);
+        int w = isFullMode ? dpToPx(58) : dpToPx(50);
         int h = isFullMode ? dpToPx(36) : dpToPx(34);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
         lp.setMargins(dpToPx(1.5f), dpToPx(1), dpToPx(1.5f), dpToPx(1));
@@ -609,7 +599,7 @@ public class FloatingRemoteManager {
         bg.setStroke(dpToPx(1.2f), Color.parseColor("#94A3B8"));
         b.setBackground(bg);
 
-        int w = isFullMode ? dpToPx(70) : dpToPx(44);
+        int w = isFullMode ? dpToPx(62) : dpToPx(44);
         int h = isFullMode ? dpToPx(36) : dpToPx(32);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
         lp.setMargins(dpToPx(1.5f), dpToPx(1), dpToPx(1.5f), dpToPx(1));
